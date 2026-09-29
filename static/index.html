@@ -1,0 +1,2738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ava — AI Voice Receptionist · Brightside Dental</title>
+<meta name="description" content="Production-grade AI Voice Receptionist built with Vercel design system, local Whisper STT, Groq Llama 3.3, and Edge-TTS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   VERCEL DESIGN SYSTEM TOKENS
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --bg-app: #000000;
+  --bg-subtle: #08080a;
+  --bg-card: #0d0d11;
+  --bg-card-hover: #121217;
+  --bg-surface: #17171d;
+  --bg-elevated: #1e1e26;
+  
+  --glass-bg: rgba(13, 13, 17, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.16);
+  --glass-blur: 20px;
+
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-dim: #3f3f46;
+
+  --accent-cyan: #00E5FF;
+  --accent-cyan-dim: rgba(0, 229, 255, 0.08);
+  --accent-cyan-border: rgba(0, 229, 255, 0.22);
+  --accent-cyan-glow: rgba(0, 229, 255, 0.25);
+
+  --accent-emerald: #00E599;
+  --accent-emerald-dim: rgba(0, 229, 153, 0.08);
+  --accent-emerald-border: rgba(0, 229, 153, 0.22);
+
+  --accent-amber: #F5A623;
+  --accent-amber-dim: rgba(245, 166, 35, 0.08);
+  --accent-amber-border: rgba(245, 166, 35, 0.22);
+
+  --accent-rose: #FF0080;
+  --accent-rose-dim: rgba(255, 0, 128, 0.08);
+  --accent-rose-border: rgba(255, 0, 128, 0.22);
+
+  --accent-violet: #7928CA;
+  
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* Background Vercel Mesh & Light Cone */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-app);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.app-container::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 750px;
+  height: 380px;
+  background: radial-gradient(ellipse at center, rgba(0, 229, 255, 0.08) 0%, rgba(121, 40, 202, 0.04) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER NAVIGATION (VERCEL TOPBAR)
+   ═══════════════════════════════════════════════════════════ */
+.header {
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: 50;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #111 0%, #222 100%);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-logo svg {
+  width: 18px;
+  height: 18px;
+  color: var(--accent-cyan);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+  border: 1px solid var(--accent-cyan-border);
+}
+
+.brand-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Nav Tabs */
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 3px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  gap: 2px;
+}
+
+.nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 180ms var(--ease-smooth);
+}
+
+.nav-tab svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.6;
+  transition: opacity 180ms;
+}
+
+.nav-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab:hover svg {
+  opacity: 0.9;
+}
+
+.nav-tab.active {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border-hover);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.nav-tab.active svg {
+  color: var(--accent-cyan);
+  opacity: 1;
+}
+
+.nav-badge-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.nav-tab.active .nav-badge-count {
+  background: var(--accent-cyan-dim);
+  color: var(--accent-cyan);
+}
+
+/* Header Right Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: 'Geist Mono', monospace;
+}
+
+.status-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-emerald);
+  box-shadow: 0 0 8px rgba(0, 229, 153, 0.6);
+  animation: pulse-dot 2.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.status-indicator-dot.off {
+  background: var(--accent-rose);
+  box-shadow: 0 0 8px rgba(255, 0, 128, 0.5);
+}
+
+.btn-new-session {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 160ms var(--ease-smooth);
+}
+
+.btn-new-session:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--glass-border-hover);
+}
+
+.btn-new-session svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN VIEW CONTAINER
+   ═══════════════════════════════════════════════════════════ */
+.main-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.view-panel {
+  display: none;
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.view-panel.active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 1: VOICE CONSOLE (HERO STAGE)
+   ═══════════════════════════════════════════════════════════ */
+#view-console {
+  display: none;
+  height: 100%;
+  overflow: hidden;
+  padding: 20px 24px;
+}
+
+#view-console.active {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+}
+
+/* Left Stage: Voice Orb & Visualizer + Controls */
+.console-stage {
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  overflow: hidden;
+  position: relative;
+}
+
+.stage-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.stage-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stage-mode-pill {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+}
+
+.stage-telemetry-badge {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stage-telemetry-badge span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.telemetry-val {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+/* Visualizer Canvas Area */
+.visualizer-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 20px;
+  min-height: 280px;
+}
+
+#orb-canvas {
+  width: 100%;
+  height: 240px;
+  display: block;
+}
+
+.agent-state-card {
+  position: absolute;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan-glow);
+}
+
+.state-dot.listening {
+  background: var(--accent-emerald);
+  box-shadow: 0 0 10px rgba(0, 229, 153, 0.6);
+  animation: pulse-dot 1s infinite;
+}
+
+.state-dot.processing {
+  background: var(--accent-amber);
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.6);
+  animation: pulse-dot 0.8s infinite;
+}
+
+.state-dot.speaking {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 12px var(--accent-cyan-glow);
+  animation: pulse-dot 0.5s infinite;
+}
+
+/* Console Quick Prompts */
+.stage-prompts {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.prompt-chip {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  transition: all 140ms var(--ease-smooth);
+}
+
+.prompt-chip:hover {
+  background: var(--accent-cyan-dim);
+  border-color: var(--accent-cyan-border);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* Stage Bottom Controls */
+.stage-dock {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(10, 10, 12, 0.9);
+}
+
+.mic-action-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f1f26 0%, #121217 100%);
+  border: 1px solid var(--glass-border-hover);
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 180ms var(--ease-spring);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mic-action-btn:hover {
+  transform: scale(1.06);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 16px var(--accent-cyan-glow);
+}
+
+.mic-action-btn:active {
+  transform: scale(0.95);
+}
+
+.mic-action-btn.recording {
+  background: linear-gradient(135deg, #ff0055 0%, #990033 100%);
+  border-color: var(--accent-rose);
+  color: #fff;
+  box-shadow: 0 0 24px rgba(255, 0, 128, 0.6);
+  animation: rec-glow 1.2s infinite alternate;
+}
+
+@keyframes rec-glow {
+  0% { box-shadow: 0 0 12px rgba(255, 0, 128, 0.4); }
+  100% { box-shadow: 0 0 26px rgba(255, 0, 128, 0.8); }
+}
+
+.mic-action-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.input-box-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.text-input-field {
+  width: 100%;
+  height: 40px;
+  padding: 0 42px 0 14px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: all 180ms var(--ease-smooth);
+}
+
+.text-input-field:focus {
+  border-color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 1px var(--accent-cyan-border);
+}
+
+.text-input-field::placeholder {
+  color: var(--text-dim);
+}
+
+.send-action-btn {
+  position: absolute;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 140ms;
+}
+
+.send-action-btn:hover {
+  color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.send-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Right Stage: Transcript & Real-Time Booking Pill */
+.console-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+}
+
+/* Live Booking Extraction Card */
+.live-booking-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.live-booking-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+  opacity: 0.8;
+}
+
+.card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.booking-status-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+  text-transform: uppercase;
+}
+
+.booking-status-tag.confirmed {
+  background: var(--accent-emerald-dim);
+  color: var(--accent-emerald);
+  border-color: var(--accent-emerald-border);
+}
+
+.booking-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.booking-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.booking-field-lbl {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+}
+
+.booking-field-val {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.booking-field-val.empty {
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Transcript Stream */
+.transcript-card {
+  flex: 1;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.transcript-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.transcript-title {
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transcript-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  animation: slide-in 220ms var(--ease-spring) both;
+}
+
+.msg-row.user {
+  flex-direction: row-reverse;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.msg-avatar.ai {
+  background: linear-gradient(135deg, #0070f3 0%, #00dfd8 100%);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+}
+
+.msg-avatar.user {
+  background: var(--bg-surface);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+
+.msg-avatar svg {
+  width: 14px;
+  height: 14px;
+}
+
+.msg-content-wrap {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+}
+
+.msg-row.user .msg-content-wrap {
+  align-items: flex-end;
+}
+
+.msg-header-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 11px;
+}
+
+.msg-sender-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.msg-timestamp {
+  font-size: 9.5px;
+  color: var(--text-dim);
+}
+
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.msg-bubble.ai {
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  border-top-left-radius: 2px;
+}
+
+.msg-bubble.user {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-top-right-radius: 2px;
+}
+
+.msg-meta-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  font-family: 'Geist Mono', monospace;
+}
+
+.msg-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+}
+
+.typing-indicator span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  animation: typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.16s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes typing-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 2: APPOINTMENTS DASHBOARD
+   ═══════════════════════════════════════════════════════════ */
+.dash-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.dash-title-wrap h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+
+.dash-title-wrap p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  backdrop-filter: blur(var(--glass-blur));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.stat-number {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+  font-family: 'Geist Mono', monospace;
+}
+
+.stat-sub {
+  font-size: 11px;
+  color: var(--accent-emerald);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Data Table Panel */
+.table-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.table-toolbar {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--glass-border);
+  gap: 12px;
+}
+
+.table-search-input {
+  width: 260px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.table-search-input:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #000;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: all 140ms var(--ease-smooth);
+}
+
+.btn-primary:hover {
+  background: #e4e4e7;
+  transform: translateY(-1px);
+}
+
+.btn-primary svg {
+  width: 14px;
+  height: 14px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table th {
+  padding: 12px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.data-table td {
+  padding: 14px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+}
+
+.status-pill-table {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-pill-table.confirmed {
+  background: var(--accent-emerald-dim);
+  color: var(--accent-emerald);
+  border: 1px solid var(--accent-emerald-border);
+}
+
+.status-pill-table.cancelled {
+  background: var(--accent-rose-dim);
+  color: var(--accent-rose);
+  border: 1px solid var(--accent-rose-border);
+}
+
+.action-btn-sm {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: all 120ms;
+}
+
+.action-btn-sm:hover {
+  background: var(--accent-rose-dim);
+  color: var(--accent-rose);
+  border-color: var(--accent-rose-border);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 3: CRM LEADS
+   ═══════════════════════════════════════════════════════════ */
+.lead-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.lead-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 180ms var(--ease-smooth);
+}
+
+.lead-card:hover {
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.lead-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lead-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lead-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #1e1e24 0%, #121216 100%);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent-cyan);
+}
+
+.lead-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.lead-source {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lead-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lead-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-info-item svg {
+  width: 13px;
+  height: 13px;
+  color: var(--text-muted);
+}
+
+.lead-notes-box {
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  max-height: 70px;
+  overflow-y: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 4: SERVICES & PRICING
+   ═══════════════════════════════════════════════════════════ */
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.service-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: all 200ms var(--ease-smooth);
+}
+
+.service-card:hover {
+  border-color: var(--accent-cyan-border);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.service-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.service-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.service-price {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  font-family: 'Geist Mono', monospace;
+}
+
+.service-duration {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.service-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.service-book-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 140ms;
+}
+
+.service-book-btn:hover {
+  background: var(--accent-cyan-dim);
+  border-color: var(--accent-cyan-border);
+  color: var(--accent-cyan);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 5: TELEMETRY & LATENCY
+   ═══════════════════════════════════════════════════════════ */
+.telemetry-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.telemetry-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.waterfall-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.waterfall-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.waterfall-bar-track {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.waterfall-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 400ms var(--ease-spring);
+}
+
+.fill-stt { background: linear-gradient(90deg, #F5A623, #FFD000); }
+.fill-llm { background: linear-gradient(90deg, #00E5FF, #0070F3); }
+.fill-tts { background: linear-gradient(90deg, #00E599, #10B981); }
+
+/* ═══════════════════════════════════════════════════════════
+   VIEW 6: SETTINGS
+   ═══════════════════════════════════════════════════════════ */
+.settings-container {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-group {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 10px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-input, .form-select {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.form-select option {
+  background: #111;
+  color: #fff;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL DIALOGS & TOASTS
+   ═══════════════════════════════════════════════════════════ */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border-hover);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: modal-pop 200ms var(--ease-spring);
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border-hover);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  animation: toast-in 220ms var(--ease-spring) both;
+}
+
+.toast.success {
+  border-color: var(--accent-emerald-border);
+  color: var(--accent-emerald);
+}
+
+.toast.error {
+  border-color: var(--accent-rose-border);
+  color: var(--accent-rose);
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(12px); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE LAYOUT
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  #view-console.active {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .telemetry-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0 16px;
+  }
+  .nav-tab span:not(.nav-badge-count) {
+    display: none;
+  }
+  .view-panel {
+    padding: 16px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- ══════════════ HEADER BAR ══════════════ -->
+  <header class="header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-title">
+          Brightside Dental
+          <span class="brand-badge">AI Receptionist</span>
+        </div>
+        <div class="brand-sub">Powered by Whisper · Groq Llama 3.3 · Edge-TTS</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="switchView('console')" id="tab-btn-console">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+        <span>Voice Console</span>
+      </button>
+      <button class="nav-tab" onclick="switchView('appointments')" id="tab-btn-appointments">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Appointments</span>
+        <span class="nav-badge-count" id="badge-appts-count">0</span>
+      </button>
+      <button class="nav-tab" onclick="switchView('leads')" id="tab-btn-leads">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        <span>CRM Leads</span>
+        <span class="nav-badge-count" id="badge-leads-count">0</span>
+      </button>
+      <button class="nav-tab" onclick="switchView('services')" id="tab-btn-services">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Services</span>
+      </button>
+      <button class="nav-tab" onclick="switchView('telemetry')" id="tab-btn-telemetry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Telemetry</span>
+      </button>
+      <button class="nav-tab" onclick="switchView('settings')" id="tab-btn-settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div class="status-pill">
+        <div class="status-indicator-dot" id="ws-dot"></div>
+        <span id="ws-status-text">Connected</span>
+      </div>
+      <button class="btn-new-session" onclick="resetConversation()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        New Session
+      </button>
+    </div>
+  </header>
+
+  <!-- ══════════════ MAIN VIEWS ══════════════ -->
+  <main class="main-content">
+
+    <!-- ── VIEW 1: VOICE CONSOLE ── -->
+    <div class="view-panel active" id="view-console">
+      
+      <!-- Stage Column -->
+      <div class="console-stage">
+        <div class="stage-header">
+          <div class="stage-title-wrap">
+            <span class="stage-title">Ava Receptionist Live Stage</span>
+            <span class="stage-mode-pill" id="stage-mode-badge">Low Latency Mode</span>
+          </div>
+          <div class="stage-telemetry-badge">
+            <span>STT: <span class="telemetry-val" id="stt-val">0ms</span></span>
+            <span>LLM: <span class="telemetry-val" id="llm-val">0ms</span></span>
+            <span>TTS: <span class="telemetry-val" id="tts-val">0ms</span></span>
+            <span>Total: <span class="telemetry-val" id="total-val">0ms</span></span>
+          </div>
+        </div>
+
+        <!-- Canvas Orb Visualizer -->
+        <div class="visualizer-container">
+          <canvas id="orb-canvas"></canvas>
+          <div class="agent-state-card">
+            <div class="state-dot" id="agent-state-dot"></div>
+            <span id="agent-state-label">Ready & Listening</span>
+          </div>
+        </div>
+
+        <!-- Quick Starter Prompts -->
+        <div class="stage-prompts">
+          <button class="prompt-chip" onclick="sendQuickPrompt('Hi Ava, I would like to book a teeth cleaning appointment tomorrow at 2 PM.')">
+            ✨ Book teeth cleaning tomorrow at 2 PM
+          </button>
+          <button class="prompt-chip" onclick="sendQuickPrompt('What are your dental checkup and teeth whitening prices?')">
+            💰 Check prices & services
+          </button>
+          <button class="prompt-chip" onclick="sendQuickPrompt('Do you have any available slots for a checkup today?')">
+            📅 Check today's slots
+          </button>
+          <button class="prompt-chip" onclick="sendQuickPrompt('I have an emergency toothache and need a consultation.')">
+            🚨 Emergency dental care
+          </button>
+        </div>
+
+        <!-- Microphone / Input Dock -->
+        <div class="stage-dock">
+          <button class="mic-action-btn" id="mic-button" 
+                  onmousedown="startVoiceRecord()" onmouseup="stopVoiceRecord()"
+                  ontouchstart="startVoiceRecord()" ontouchend="stopVoiceRecord()"
+                  title="Hold to Speak">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+              <line x1="8" y1="22" x2="16" y2="22"/>
+            </svg>
+          </button>
+
+          <div class="input-box-wrapper">
+            <input type="text" class="text-input-field" id="user-text-input" 
+                   placeholder="Type a message or hold the mic to speak..." 
+                   onkeydown="if(event.key==='Enter') sendTextMessage()">
+            <button class="send-action-btn" onclick="sendTextMessage()" title="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transcript & Extracted Info Sidebar -->
+      <div class="console-sidebar">
+        
+        <!-- Live Extraction Card -->
+        <div class="live-booking-card">
+          <div class="card-title-row">
+            <span class="card-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Live Booking Record
+            </span>
+            <span class="booking-status-tag" id="booking-status-tag">In Progress</span>
+          </div>
+
+          <div class="booking-grid">
+            <div class="booking-field">
+              <span class="booking-field-lbl">Patient Name</span>
+              <span class="booking-field-val empty" id="rec-name">Not provided</span>
+            </div>
+            <div class="booking-field">
+              <span class="booking-field-lbl">Phone Number</span>
+              <span class="booking-field-val empty" id="rec-phone">Not provided</span>
+            </div>
+            <div class="booking-field">
+              <span class="booking-field-lbl">Requested Service</span>
+              <span class="booking-field-val empty" id="rec-service">Not selected</span>
+            </div>
+            <div class="booking-field">
+              <span class="booking-field-lbl">Scheduled Date & Time</span>
+              <span class="booking-field-val empty" id="rec-datetime">Not scheduled</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Transcript -->
+        <div class="transcript-card">
+          <div class="transcript-header">
+            <span class="transcript-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Live Conversation Feed
+            </span>
+            <button class="action-btn-sm" onclick="clearTranscript()">Clear</button>
+          </div>
+          <div class="transcript-body" id="transcript-feed">
+            <!-- Dynamic Messages -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ── VIEW 2: APPOINTMENTS ── -->
+    <div class="view-panel" id="view-appointments">
+      <div class="dash-header-row">
+        <div class="dash-title-wrap">
+          <h2>Appointments Calendar</h2>
+          <p>Real-time dental appointment bookings synchronized with Ava Voice Agent.</p>
+        </div>
+        <button class="btn-primary" onclick="openManualBookingModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Book Appointment
+        </button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Total Appointments</span>
+          <span class="stat-number" id="stat-total-appts">0</span>
+          <span class="stat-sub">Across all dates</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Confirmed Bookings</span>
+          <span class="stat-number" id="stat-confirmed-appts">0</span>
+          <span class="stat-sub">Active in Calendar</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Total Inbound Calls</span>
+          <span class="stat-number" id="stat-total-calls">0</span>
+          <span class="stat-sub">Voice & WebSocket</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Booking Conversion</span>
+          <span class="stat-number" id="stat-conversion-rate">0%</span>
+          <span class="stat-sub">Calls to bookings</span>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-toolbar">
+          <input type="text" class="table-search-input" id="appt-search" placeholder="Search appointments..." oninput="filterAppointments()">
+          <span style="font-size:12px; color:var(--text-muted);" id="table-count-label">Showing all records</span>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Patient</th>
+              <th>Phone</th>
+              <th>Service</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="appointments-table-body">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── VIEW 3: CRM LEADS ── -->
+    <div class="view-panel" id="view-leads">
+      <div class="dash-header-row">
+        <div class="dash-title-wrap">
+          <h2>CRM Patient Leads</h2>
+          <p>Captured patient profiles, contact details, and automated receptionist interaction notes.</p>
+        </div>
+      </div>
+
+      <div class="lead-cards-grid" id="leads-grid">
+        <!-- Dynamic lead cards -->
+      </div>
+    </div>
+
+    <!-- ── VIEW 4: SERVICES & PRICING ── -->
+    <div class="view-panel" id="view-services">
+      <div class="dash-header-row">
+        <div class="dash-title-wrap">
+          <h2>Clinic Dental Services</h2>
+          <p>Browse official clinic procedures, fees, and standard session durations.</p>
+        </div>
+      </div>
+
+      <div class="services-grid" id="services-grid">
+        <!-- Dynamic services -->
+      </div>
+    </div>
+
+    <!-- ── VIEW 5: TELEMETRY ── -->
+    <div class="view-panel" id="view-telemetry">
+      <div class="dash-header-row">
+        <div class="dash-title-wrap">
+          <h2>Telemetry & Latency Profiling</h2>
+          <p>Live benchmarks of local Whisper STT, Groq Llama 3.3 LLM inference, and Edge-TTS synthesis.</p>
+        </div>
+      </div>
+
+      <div class="telemetry-layout">
+        <div class="telemetry-card">
+          <h3 style="font-size: 14px; font-weight: 600;">Latency Waterfall (Latest Turn)</h3>
+          
+          <div class="waterfall-step">
+            <div class="waterfall-header">
+              <span>Speech-to-Text (Whisper Local)</span>
+              <span id="wat-stt-label">0 ms</span>
+            </div>
+            <div class="waterfall-bar-track">
+              <div class="waterfall-bar-fill fill-stt" id="wat-stt-bar" style="width: 20%;"></div>
+            </div>
+          </div>
+
+          <div class="waterfall-step">
+            <div class="waterfall-header">
+              <span>LLM Inference (Groq Llama 3.3)</span>
+              <span id="wat-llm-label">0 ms</span>
+            </div>
+            <div class="waterfall-bar-track">
+              <div class="waterfall-bar-fill fill-llm" id="wat-llm-bar" style="width: 45%;"></div>
+            </div>
+          </div>
+
+          <div class="waterfall-step">
+            <div class="waterfall-header">
+              <span>Text-to-Speech (Edge-TTS)</span>
+              <span id="wat-tts-label">0 ms</span>
+            </div>
+            <div class="waterfall-bar-track">
+              <div class="waterfall-bar-fill fill-tts" id="wat-tts-bar" style="width: 35%;"></div>
+            </div>
+          </div>
+
+          <div style="padding-top: 10px; border-top: 1px solid var(--glass-border); display: flex; justify-content: space-between; font-weight: 600;">
+            <span>Total End-to-End Turn Time</span>
+            <span style="color: var(--accent-cyan);" id="wat-total-label">0 ms</span>
+          </div>
+        </div>
+
+        <div class="telemetry-card">
+          <h3 style="font-size: 14px; font-weight: 600;">Engine Architecture</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
+            <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);">
+              <span>Speech-to-Text Model</span>
+              <span style="font-family: 'Geist Mono'; color: #fff;">OpenAI Whisper (tiny)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);">
+              <span>LLM Engine</span>
+              <span style="font-family: 'Geist Mono'; color: #fff;">Groq llama-3.3-70b-versatile</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);">
+              <span>Neural TTS Engine</span>
+              <span style="font-family: 'Geist Mono'; color: #fff;">Microsoft Edge-TTS (en-US-AriaNeural)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);">
+              <span>Real-time Transport</span>
+              <span style="font-family: 'Geist Mono'; color: #fff;">FastAPI WebSockets (Full Duplex)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── VIEW 6: SETTINGS ── -->
+    <div class="view-panel" id="view-settings">
+      <div class="dash-header-row">
+        <div class="dash-title-wrap">
+          <h2>Receptionist Settings</h2>
+          <p>Configure TTS voices, model parameters, and clinic branding.</p>
+        </div>
+      </div>
+
+      <div class="settings-container">
+        <div class="settings-group">
+          <div class="settings-group-title">Voice & Audio Configuration</div>
+          
+          <div class="form-field">
+            <label class="form-label">TTS Voice Model</label>
+            <select class="form-select" id="setting-voice">
+              <option value="en-US-AriaNeural">Aria (US English, Female) — Natural & Warm</option>
+              <option value="en-US-GuyNeural">Guy (US English, Male) — Professional</option>
+              <option value="en-US-JennyNeural">Jenny (US English, Female) — Conversational</option>
+              <option value="en-GB-SoniaNeural">Sonia (British English, Female) — Refined</option>
+              <option value="en-AU-NatashaNeural">Natasha (Australian English, Female) — Friendly</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label">Groq LLM Model</label>
+            <select class="form-select" id="setting-model">
+              <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (Recommended)</option>
+              <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (Ultra-low latency)</option>
+              <option value="mixtral-8x7b-32768">Mixtral 8x7B 32k</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Clinic Details</div>
+          
+          <div class="form-field">
+            <label class="form-label">Clinic Name</label>
+            <input type="text" class="form-input" id="setting-clinic-name" value="Brightside Dental Clinic">
+          </div>
+
+          <div class="form-field">
+            <label class="form-label">Contact Phone</label>
+            <input type="text" class="form-input" id="setting-clinic-phone" value="(555) 234-5678">
+          </div>
+
+          <button class="btn-primary" onclick="saveSettings()" style="align-self: flex-start; margin-top: 8px;">
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+<!-- ══════════════ MODAL: MANUAL BOOKING ══════════════ -->
+<div class="modal-overlay" id="manual-booking-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 class="modal-title">Manual Appointment Entry</h3>
+      <button onclick="closeManualBookingModal()" style="color:var(--text-muted);">✕</button>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Patient Full Name</label>
+      <input type="text" class="form-input" id="m-name" placeholder="Jane Doe">
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Phone Number</label>
+      <input type="text" class="form-input" id="m-phone" placeholder="555-0199">
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Service</label>
+      <select class="form-select" id="m-service">
+        <option value="Comprehensive Dental Checkup">Comprehensive Dental Checkup ($50)</option>
+        <option value="Professional Teeth Cleaning">Professional Teeth Cleaning ($80)</option>
+        <option value="Laser Teeth Whitening">Laser Teeth Whitening ($150)</option>
+        <option value="Root Canal Therapy">Root Canal Therapy ($300)</option>
+        <option value="Initial Consultation">Initial Consultation (Free)</option>
+      </select>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Date & Time</label>
+      <input type="datetime-local" class="form-input" id="m-datetime">
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+      <button class="btn-new-session" onclick="closeManualBookingModal()">Cancel</button>
+      <button class="btn-primary" onclick="submitManualBooking()">Confirm Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CLIENT JAVASCRIPT
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+/* ─── State Management ───────────────────────────────────── */
+let ws = null;
+let audioCtx = null;
+let mediaStream = null;
+let scriptProcessor = null;
+let isRecording = false;
+let recordedChunks = [];
+let audioAnalyser = null;
+let currentAgentAudio = null;
+let isSpeaking = false;
+let allAppointments = [];
+
+/* ─── Navigation Tabs ────────────────────────────────────── */
+function switchView(viewName) {
+  document.querySelectorAll('.nav-tab').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+
+  const activeBtn = document.getElementById(`tab-btn-${viewName}`);
+  const activePanel = document.getElementById(`view-${viewName}`);
+
+  if (activeBtn) activeBtn.classList.add('active');
+  if (activePanel) activePanel.classList.add('active');
+
+  if (viewName === 'appointments') loadAppointments();
+  if (viewName === 'leads') loadLeads();
+  if (viewName === 'services') loadServices();
+  if (viewName === 'telemetry' || viewName === 'appointments') loadStats();
+}
+
+/* ─── Toast Notifications ────────────────────────────────── */
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toast-out 200ms ease forwards';
+    setTimeout(() => toast.remove(), 200);
+  }, 3200);
+}
+
+/* ─── WebSocket Connection ───────────────────────────────── */
+function initWebSocket() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${location.host}/ws`;
+
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch (err) {
+    console.error("WS Init Error:", err);
+    setTimeout(initWebSocket, 3000);
+    return;
+  }
+
+  ws.onopen = () => {
+    document.getElementById('ws-dot').className = 'status-indicator-dot';
+    document.getElementById('ws-status-text').textContent = 'Connected';
+    setAgentState('ready', 'Ready & Listening');
+  };
+
+  ws.onmessage = async (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleIncomingWsMessage(data);
+    } catch (e) {
+      console.error("Malformed WS packet:", e);
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('ws-dot').className = 'status-indicator-dot off';
+    document.getElementById('ws-status-text').textContent = 'Disconnected';
+    setAgentState('standby', 'Reconnecting...');
+    setTimeout(initWebSocket, 3000);
+  };
+
+  ws.onerror = (e) => console.error("WS error:", e);
+}
+
+function handleIncomingWsMessage(data) {
+  if (data.type === 'transcription') {
+    removeTypingIndicator();
+    addChatMessage('caller', data.text, 'Caller', data.stt_ms);
+    showTypingIndicator();
+    setAgentState('processing', 'Groq Llama 3.3 Thinking...');
+    if (data.stt_ms) updateTelemetry(data.stt_ms, 0, 0, data.stt_ms);
+  } else if (data.type === 'audio') {
+    removeTypingIndicator();
+    addChatMessage('ai', data.text, data.agent || 'Ava');
+    
+    if (data.extracted) {
+      updateLiveBookingCard(data.extracted);
+    }
+
+    if (data.metrics) {
+      updateTelemetry(data.metrics.stt_ms, data.metrics.llm_ms, data.metrics.tts_ms, data.metrics.total_ms);
+    }
+
+    if (data.audio) {
+      playAgentAudio(data.audio);
+    } else {
+      setAgentState('ready', 'Ready & Listening');
+    }
+
+    loadStats();
+  }
+}
+
+/* ─── Telemetry Bar Update ───────────────────────────────── */
+function updateTelemetry(stt, llm, tts, total) {
+  document.getElementById('stt-val').textContent = `${stt}ms`;
+  document.getElementById('llm-val').textContent = `${llm}ms`;
+  document.getElementById('tts-val').textContent = `${tts}ms`;
+  document.getElementById('total-val').textContent = `${total}ms`;
+
+  document.getElementById('wat-stt-label').textContent = `${stt} ms`;
+  document.getElementById('wat-llm-label').textContent = `${llm} ms`;
+  document.getElementById('wat-tts-label').textContent = `${tts} ms`;
+  document.getElementById('wat-total-label').textContent = `${total} ms`;
+
+  const maxVal = Math.max(1, total || (stt + llm + tts));
+  document.getElementById('wat-stt-bar').style.width = `${Math.min(100, (stt / maxVal) * 100)}%`;
+  document.getElementById('wat-llm-bar').style.width = `${Math.min(100, (llm / maxVal) * 100)}%`;
+  document.getElementById('wat-tts-bar').style.width = `${Math.min(100, (tts / maxVal) * 100)}%`;
+}
+
+/* ─── State Indicator ────────────────────────────────────── */
+function setAgentState(state, label) {
+  const dot = document.getElementById('agent-state-dot');
+  const txt = document.getElementById('agent-state-label');
+  dot.className = `state-dot ${state}`;
+  txt.textContent = label;
+}
+
+/* ─── Audio Recording (Microphone) ───────────────────────── */
+async function startVoiceRecord() {
+  if (isRecording) return;
+  isRecording = true;
+  recordedChunks = [];
+
+  document.getElementById('mic-button').classList.add('recording');
+  setAgentState('listening', 'Listening to you...');
+
+  try {
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioCtx.createMediaStreamSource(mediaStream);
+
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    source.connect(audioAnalyser);
+
+    scriptProcessor = audioCtx.createScriptProcessor(4096, 1, 1);
+    scriptProcessor.onaudioprocess = (e) => {
+      if (!isRecording) return;
+      const inputData = e.inputBuffer.getChannelData(0);
+      const pcm16 = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        pcm16[i] = Math.max(-32768, Math.min(32767, Math.round(inputData[i] * 32767)));
+      }
+      recordedChunks.push(pcm16);
+    };
+
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(audioCtx.destination);
+  } catch (err) {
+    console.error("Mic access denied or error:", err);
+    showToast("Microphone access denied. Please grant permission or type message.", "error");
+    isRecording = false;
+    document.getElementById('mic-button').classList.remove('recording');
+    setAgentState('ready', 'Ready & Listening');
+  }
+}
+
+function stopVoiceRecord() {
+  if (!isRecording) return;
+  isRecording = false;
+  document.getElementById('mic-button').classList.remove('recording');
+  setAgentState('processing', 'Transcribing Audio...');
+
+  if (scriptProcessor) {
+    scriptProcessor.disconnect();
+    scriptProcessor = null;
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+    mediaStream = null;
+  }
+
+  if (recordedChunks.length === 0) {
+    setAgentState('ready', 'Ready & Listening');
+    return;
+  }
+
+  const totalLength = recordedChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const merged = new Int16Array(totalLength);
+  let offset = 0;
+  for (const chunk of recordedChunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  recordedChunks = [];
+
+  const bytes = new Uint8Array(merged.buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  const base64Audio = btoa(binary);
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'audio',
+      audio: base64Audio,
+      sample_rate: audioCtx ? audioCtx.sampleRate : 16000
+    }));
+  }
+}
+
+/* ─── Audio Playback (Edge-TTS) ──────────────────────────── */
+async function playAgentAudio(base64Mp3) {
+  try {
+    const binary = atob(base64Mp3);
+    const buffer = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+    const blob = new Blob([buffer], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(blob);
+
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const audio = new Audio(audioUrl);
+    const source = audioCtx.createMediaElementSource(audio);
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    source.connect(audioAnalyser);
+    audioAnalyser.connect(audioCtx.destination);
+
+    isSpeaking = true;
+    setAgentState('speaking', 'Ava is Speaking...');
+
+    await audio.play();
+
+    audio.onended = () => {
+      isSpeaking = false;
+      URL.revokeObjectURL(audioUrl);
+      setAgentState('ready', 'Ready & Listening');
+    };
+  } catch (err) {
+    console.error("Audio playback error:", err);
+    isSpeaking = false;
+    setAgentState('ready', 'Ready & Listening');
+  }
+}
+
+/* ─── Text Messaging ─────────────────────────────────────── */
+function sendTextMessage() {
+  const input = document.getElementById('user-text-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast("Server disconnected. Reconnecting...", "error");
+    return;
+  }
+
+  addChatMessage('caller', text, 'You');
+  showTypingIndicator();
+  setAgentState('processing', 'Groq Llama 3.3 Thinking...');
+
+  ws.send(JSON.stringify({ type: 'text', text }));
+  input.value = '';
+}
+
+function sendQuickPrompt(promptText) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showToast("Server disconnected.", "error");
+    return;
+  }
+  addChatMessage('caller', promptText, 'You');
+  showTypingIndicator();
+  setAgentState('processing', 'Groq Llama 3.3 Thinking...');
+  ws.send(JSON.stringify({ type: 'text', text: promptText }));
+}
+
+function resetConversation() {
+  clearTranscript();
+  document.getElementById('rec-name').textContent = 'Not provided';
+  document.getElementById('rec-phone').textContent = 'Not provided';
+  document.getElementById('rec-service').textContent = 'Not selected';
+  document.getElementById('rec-datetime').textContent = 'Not scheduled';
+  document.getElementById('booking-status-tag').textContent = 'In Progress';
+  document.getElementById('booking-status-tag').className = 'booking-status-tag';
+
+  if (ws) {
+    ws.onclose = null;
+    ws.close();
+  }
+  setTimeout(initWebSocket, 150);
+  showToast("Session reset. Ava is ready for a new call.", "success");
+}
+
+/* ─── Chat Transcript Feed ───────────────────────────────── */
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function addChatMessage(role, text, name, sttMs = 0) {
+  const feed = document.getElementById('transcript-feed');
+  const row = document.createElement('div');
+  const isAi = role === 'ai';
+  row.className = `msg-row ${isAi ? 'ai' : 'user'}`;
+
+  const avatarSvg = isAi
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+
+  const whisperTag = sttMs > 0
+    ? `<span class="msg-meta-tag"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5"/></svg> Whisper STT (${sttMs}ms)</span>`
+    : '';
+
+  row.innerHTML = `
+    <div class="msg-avatar ${isAi ? 'ai' : 'user'}">
+      ${avatarSvg}
+    </div>
+    <div class="msg-content-wrap">
+      <div class="msg-header-line">
+        <span class="msg-sender-name">${escapeHtml(name || (isAi ? 'Ava' : 'You'))}</span>
+        <span class="msg-timestamp">${formatTime()}</span>
+      </div>
+      <div class="msg-bubble ${isAi ? 'ai' : 'user'}">${escapeHtml(text)}</div>
+      ${whisperTag ? `<div class="msg-meta-bar">${whisperTag}</div>` : ''}
+    </div>
+  `;
+
+  feed.appendChild(row);
+  feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
+}
+
+function showTypingIndicator() {
+  removeTypingIndicator();
+  const feed = document.getElementById('transcript-feed');
+  const row = document.createElement('div');
+  row.className = 'msg-row ai';
+  row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="msg-avatar ai">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/></svg>
+    </div>
+    <div class="msg-content-wrap">
+      <div class="msg-bubble ai typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  `;
+  feed.appendChild(row);
+  feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
+}
+
+function removeTypingIndicator() {
+  document.getElementById('typing-row')?.remove();
+}
+
+function clearTranscript() {
+  document.getElementById('transcript-feed').innerHTML = '';
+}
+
+/* ─── Live Booking Extraction Card ───────────────────────── */
+function updateLiveBookingCard(extracted) {
+  if (!extracted) return;
+  if (extracted.name) {
+    const el = document.getElementById('rec-name');
+    el.textContent = extracted.name;
+    el.classList.remove('empty');
+  }
+  if (extracted.phone) {
+    const el = document.getElementById('rec-phone');
+    el.textContent = extracted.phone;
+    el.classList.remove('empty');
+  }
+  if (extracted.service) {
+    const el = document.getElementById('rec-service');
+    el.textContent = extracted.service;
+    el.classList.remove('empty');
+  }
+  if (extracted.date || extracted.time) {
+    const el = document.getElementById('rec-datetime');
+    el.textContent = `${extracted.date || 'TBD'} at ${extracted.time || 'TBD'}`;
+    el.classList.remove('empty');
+  }
+
+  if (extracted.appt_id) {
+    const tag = document.getElementById('booking-status-tag');
+    tag.textContent = `Confirmed (${extracted.appt_id})`;
+    tag.className = 'booking-status-tag confirmed';
+    showToast(`✓ Booking Confirmed! Ref #${extracted.appt_id}`, 'success');
+  }
+}
+
+/* ─── Dynamic Canvas Visualizer ──────────────────────────── */
+function initCanvasOrb() {
+  const canvas = document.getElementById('orb-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+    canvas.width = canvas.parentElement.clientWidth;
+    canvas.height = canvas.parentElement.clientHeight || 240;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  let angle = 0;
+  const freqData = new Uint8Array(64);
+
+  function renderVisualizer() {
+    requestAnimationFrame(renderVisualizer);
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    let audioLevel = 0;
+    if (audioAnalyser) {
+      audioAnalyser.getByteFrequencyData(freqData);
+      let sum = 0;
+      for (let i = 0; i < 16; i++) sum += freqData[i];
+      audioLevel = (sum / 16) / 255;
+    }
+
+    angle += 0.02 + audioLevel * 0.05;
+
+    // Glowing core gradient
+    const baseRadius = 45 + audioLevel * 30;
+    const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, baseRadius * 1.6);
+    
+    if (isRecording) {
+      grad.addColorStop(0, 'rgba(255, 0, 128, 0.8)');
+      grad.addColorStop(0.5, 'rgba(255, 0, 128, 0.25)');
+      grad.addColorStop(1, 'rgba(255, 0, 128, 0)');
+    } else if (isSpeaking) {
+      grad.addColorStop(0, 'rgba(0, 229, 255, 0.9)');
+      grad.addColorStop(0.5, 'rgba(0, 229, 153, 0.3)');
+      grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+    } else {
+      grad.addColorStop(0, 'rgba(0, 229, 255, 0.5)');
+      grad.addColorStop(0.6, 'rgba(121, 40, 202, 0.15)');
+      grad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+    }
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, baseRadius * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Orbital Frequency Waveform Ring
+    const numPoints = 64;
+    ctx.beginPath();
+    for (let i = 0; i <= numPoints; i++) {
+      const theta = (i / numPoints) * Math.PI * 2 + angle;
+      const freqIdx = i % 16;
+      const amp = (freqData[freqIdx] / 255) * 22;
+      const r = baseRadius + Math.sin(theta * 6 + angle * 2) * (4 + amp);
+      const px = cx + Math.cos(theta) * r;
+      const py = cy + Math.sin(theta) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = isRecording ? '#FF0080' : '#00E5FF';
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = isRecording ? '#FF0080' : '#00E5FF';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Outer Secondary Orbit
+    ctx.beginPath();
+    for (let i = 0; i <= numPoints; i++) {
+      const theta = (i / numPoints) * Math.PI * 2 - angle * 0.7;
+      const r = baseRadius * 1.35 + Math.cos(theta * 4 - angle) * 6;
+      const px = cx + Math.cos(theta) * r;
+      const py = cy + Math.sin(theta) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  renderVisualizer();
+}
+
+/* ─── REST API Integrations ──────────────────────────────── */
+async function loadAppointments() {
+  try {
+    const res = await fetch('/api/appointments');
+    const data = await res.json();
+    allAppointments = data.appointments || [];
+    document.getElementById('badge-appts-count').textContent = allAppointments.length;
+    renderAppointmentsTable(allAppointments);
+  } catch (e) {
+    console.error("Error loading appointments:", e);
+  }
+}
+
+function renderAppointmentsTable(appointments) {
+  const tbody = document.getElementById('appointments-table-body');
+  if (appointments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">No appointments found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = appointments.map(a => {
+    const dt = new Date(a.datetime);
+    const dateFormatted = dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeFormatted = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isCancelled = a.status === 'cancelled';
+
+    return `
+      <tr>
+        <td style="font-family:'Geist Mono'; font-weight:600; color:var(--accent-cyan);">${escapeHtml(a.id)}</td>
+        <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(a.name)}</td>
+        <td>${escapeHtml(a.phone)}</td>
+        <td><span style="padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.04);">${escapeHtml(a.service)}</span></td>
+        <td>${dateFormatted} · ${timeFormatted}</td>
+        <td><span class="status-pill-table ${a.status}">${escapeHtml(a.status)}</span></td>
+        <td>
+          ${!isCancelled ? `<button class="action-btn-sm" onclick="cancelAppointment('${a.id}')">Cancel</button>` : '—'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterAppointments() {
+  const query = document.getElementById('appt-search').value.toLowerCase();
+  const filtered = allAppointments.filter(a => 
+    a.name.toLowerCase().includes(query) ||
+    a.phone.toLowerCase().includes(query) ||
+    a.service.toLowerCase().includes(query) ||
+    a.id.toLowerCase().includes(query)
+  );
+  renderAppointmentsTable(filtered);
+}
+
+async function cancelAppointment(id) {
+  if (!confirm(`Are you sure you want to cancel appointment ${id}?`)) return;
+  try {
+    const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast(`Appointment ${id} cancelled`, 'success');
+      loadAppointments();
+      loadStats();
+    }
+  } catch (e) {
+    showToast('Failed to cancel appointment', 'error');
+  }
+}
+
+async function loadLeads() {
+  try {
+    const res = await fetch('/api/leads');
+    const data = await res.json();
+    const leads = data.leads || [];
+    document.getElementById('badge-leads-count').textContent = leads.length;
+
+    const grid = document.getElementById('leads-grid');
+    if (leads.length === 0) {
+      grid.innerHTML = `<div style="color:var(--text-muted); padding:20px;">No CRM leads yet.</div>`;
+      return;
+    }
+
+    grid.innerHTML = leads.map(l => {
+      const initials = l.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'CL';
+      return `
+        <div class="lead-card">
+          <div class="lead-head">
+            <div class="lead-avatar-wrap">
+              <div class="lead-avatar">${initials}</div>
+              <div>
+                <div class="lead-name">${escapeHtml(l.name)}</div>
+                <div class="lead-source">Source: ${escapeHtml(l.source)}</div>
+              </div>
+            </div>
+            <span class="booking-status-tag ${l.status === 'booked' ? 'confirmed' : ''}">${escapeHtml(l.status)}</span>
+          </div>
+
+          <div class="lead-info-list">
+            <div class="lead-info-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <span>${escapeHtml(l.phone || 'None')}</span>
+            </div>
+            ${l.email ? `
+              <div class="lead-info-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <span>${escapeHtml(l.email)}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          ${l.notes ? `
+            <div class="lead-notes-box">
+              <strong>Notes:</strong> ${escapeHtml(l.notes)}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.error("Error loading leads:", e);
+  }
+}
+
+async function loadServices() {
+  try {
+    const res = await fetch('/api/services');
+    const data = await res.json();
+    const services = data.services || [];
+    const grid = document.getElementById('services-grid');
+
+    grid.innerHTML = services.map(s => `
+      <div class="service-card">
+        <div class="service-card-top">
+          <div class="service-name">${escapeHtml(s.name)}</div>
+          <div class="service-price">$${s.price}</div>
+        </div>
+        <div class="service-duration">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Duration: ${escapeHtml(s.duration)}
+        </div>
+        <div class="service-desc">${escapeHtml(s.description)}</div>
+        <button class="service-book-btn" onclick="switchView('console'); sendQuickPrompt('I would like to schedule a ${escapeHtml(s.name)} please.');">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Book via Ava
+        </button>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error("Error loading services:", e);
+  }
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+
+    document.getElementById('stat-total-appts').textContent = data.total_appointments || 0;
+    document.getElementById('stat-confirmed-appts').textContent = data.confirmed_appointments || 0;
+    document.getElementById('stat-total-calls').textContent = data.total_calls || 0;
+    document.getElementById('stat-conversion-rate').textContent = data.conversion_rate || '0%';
+  } catch (e) {
+    console.error("Error loading stats:", e);
+  }
+}
+
+/* ─── Manual Booking Modal ───────────────────────────────── */
+function openManualBookingModal() {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(14, 0, 0, 0);
+  document.getElementById('m-datetime').value = tomorrow.toISOString().slice(0, 16);
+  document.getElementById('manual-booking-modal').classList.add('open');
+}
+
+function closeManualBookingModal() {
+  document.getElementById('manual-booking-modal').classList.remove('open');
+}
+
+async function submitManualBooking() {
+  const name = document.getElementById('m-name').value.trim();
+  const phone = document.getElementById('m-phone').value.trim();
+  const service = document.getElementById('m-service').value;
+  const dtVal = document.getElementById('m-datetime').value;
+
+  if (!name || !phone || !dtVal) {
+    showToast("Please fill in patient name, phone, and time", "error");
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, service, datetime: dtVal })
+    });
+
+    if (res.ok) {
+      showToast("Appointment booked successfully!", "success");
+      closeManualBookingModal();
+      loadAppointments();
+      loadStats();
+    } else {
+      const err = await res.json();
+      showToast(err.detail || "Booking failed", "error");
+    }
+  } catch (e) {
+    showToast("Error creating booking", "error");
+  }
+}
+
+/* ─── Settings API ───────────────────────────────────────── */
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data.tts_voice) document.getElementById('setting-voice').value = data.tts_voice;
+    if (data.groq_model) document.getElementById('setting-model').value = data.groq_model;
+    if (data.clinic_name) document.getElementById('setting-clinic-name').value = data.clinic_name;
+    if (data.clinic_phone) document.getElementById('setting-clinic-phone').value = data.clinic_phone;
+  } catch (e) {}
+}
+
+async function saveSettings() {
+  const tts_voice = document.getElementById('setting-voice').value;
+  const groq_model = document.getElementById('setting-model').value;
+  const clinic_name = document.getElementById('setting-clinic-name').value.trim();
+  const clinic_phone = document.getElementById('setting-clinic-phone').value.trim();
+
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tts_voice, groq_model, clinic_name, clinic_phone })
+    });
+    if (res.ok) {
+      showToast("Settings updated successfully", "success");
+    }
+  } catch (e) {
+    showToast("Failed to save settings", "error");
+  }
+}
+
+/* ─── Startup Initialization ─────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  initWebSocket();
+  initCanvasOrb();
+  loadAppointments();
+  loadLeads();
+  loadServices();
+  loadStats();
+  loadSettings();
+});
+</script>
+</body>
+</html>
