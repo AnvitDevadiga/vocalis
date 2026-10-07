@@ -1,333 +1,74 @@
-# 🎙️ Ava — Real-Time Multimodal Voice Receptionist
+# Vocalis
 
-> **The SaaS Cash Cow** — A $0-cost AI voice agent that answers calls, books appointments, and updates a mock CRM. Built for your Upwork portfolio to win high-ticket clients.
+Repository: [AnvitDevadiga/Vocalis](https://github.com/AnvitDevadiga/Vocalis).
 
-![Stack](https://img.shields.io/badge/stack-FastAPI%20%7C%20WebRTC%20%7C%20Whisper%20%7C%20Groq%20%7C%20EdgeTTS-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Cost](https://img.shields.io/badge/cost-%240-ff69b4)
+Vocalis is an **early multi-tenant voice-agent pilot**, evolved from a single-clinic prototype. It includes a browser microphone demo, Twilio inbound speech-turn integration, tenant-scoped call records, a small knowledge retriever, local appointment and lead tools, optional Google Calendar and HubSpot adapters, escalation records, and measured per-turn server timing. It is **not yet a production-ready real-time phone platform**; see [current state](docs/CURRENT_STATE.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
----
-
-## ✨ What It Does
-
-Ava is a real-time, ultra-low-latency AI voice receptionist for **Brightside Dental Clinic**. When a "caller" connects via the web interface:
-
-1. **Captures audio** via WebRTC (browser microphone)
-2. **Transcribes speech** locally using OpenAI Whisper (`tiny` model)
-3. **Generates intelligent responses** via Groq's LLaMA 3 (500+ tokens/sec)
-4. **Speaks back** using Microsoft Edge TTS (free, natural-sounding voice)
-5. **Books appointments** in a mock Google Calendar
-6. **Updates CRM** (mock HubSpot/Salesforce) with lead data
-
-**Total latency: ~300–800ms** (well under the 500ms target for natural conversation).
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐      WebSocket       ┌─────────────────────────────────────┐
-│   Browser       │ ◄──────────────────► │  FastAPI Backend (Python)           │
-│  (WebRTC mic)   │   audio + text       │                                     │
-└─────────────────┘                      │  ┌─────────────┐  ┌──────────────┐  │
-                                         │  │  Whisper    │  │   Groq LLM   │  │
-                                         │  │  (local)    │  │  (API/Free)  │  │
-                                         │  │  STT        │  │  llama3-8b   │  │
-                                         │  └─────────────┘  └──────────────┘  │
-                                         │         │                  │         │
-                                         │  ┌─────────────┐  ┌──────────────┐  │
-                                         │  │  Edge TTS   │  │ Mock Calendar│  │
-                                         │  │  (free)     │  │  + CRM       │  │
-                                         │  └─────────────┘  └──────────────┘  │
-                                         └─────────────────────────────────────┘
+```mermaid
+flowchart LR
+  Browser[Browser microphone/text] --> WS[FastAPI WebSocket]
+  Twilio[Twilio phone number] --> Hook[Signed Twilio webhooks]
+  WS --> Runtime[Conversation runtime]
+  Hook --> Runtime
+  Runtime --> RAG[Tenant-scoped lexical retrieval]
+  Runtime --> Groq[Groq LLM]
+  Runtime --> DB[(SQLite local pilot)]
+  WS --> Whisper[Local faster-whisper]
+  WS --> Edge[Edge TTS]
+  API[Authenticated API] --> DB
+  API --> Google[Optional Google Calendar]
+  API --> HubSpot[Optional HubSpot]
 ```
 
-| Component | Technology | Cost |
-|-----------|-----------|------|
-| **Phone/Audio Input** | WebRTC (browser mic) | $0 |
-| **WebSocket Server** | FastAPI + Uvicorn | $0 |
-| **Speech-to-Text** | openai-whisper / faster-whisper (`tiny`) | $0 (local CPU) |
-| **LLM Brain** | Groq API (LLaMA 3 8B) | $0 (free tier: 1.5M tokens/day) |
-| **Text-to-Speech** | edge-tts (Microsoft Edge voices) | $0 |
-| **Calendar** | Mock Google Calendar (in-memory) | $0 |
-| **CRM** | Mock HubSpot/Salesforce (in-memory) | $0 |
+## Capabilities and demo
 
----
+The served browser demo is at `/` after local setup. No hosted live URL or screenshot is available. Supported actions today: tenant-scoped text knowledge upload/retrieval, browser conversation, inbound Twilio speech turns, local appointment booking/cancellation, local lead upsert, optional Google Calendar booking, optional HubSpot contact upsert, and human escalation records. Voice booking asks the caller to confirm the exact draft before creating an appointment.
 
-## 🚀 Quick Start
+## Local setup
 
-### Prerequisites
-- Python 3.9+
-- A free Groq API key → [console.groq.com/keys](https://console.groq.com/keys)
-- Microphone access in your browser
+Requires Python 3.12+ and a Groq API key for generated responses. Audio transcription requires the `faster-whisper` model download on first use. TTS uses Edge TTS. Text conversation works without microphone dependencies, but without a Groq key it returns an explicit outage response.
 
-### 1. Clone & Enter Directory
 ```bash
-cd voice-receptionist
-```
-
-### 2. Create Virtual Environment
-```bash
-python -m venv venv
-
-# macOS/Linux
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-> **Note:** The first run will download the Whisper `tiny` model (~39 MB). This is automatic.
-
-### 4. Configure Environment
-```bash
 cp .env.example .env
+# Fill GROQ_API_KEY in .env, then export the environment (or use a process manager).
+set -a; source .env; set +a
+python -m vocalis.admin 'Example Business'
+uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Edit `.env` and add your Groq API key:
-```env
-GROQ_API_KEY=gsk_your_actual_key_here
-```
+The bootstrap prints a tenant ID and API key once. Store them securely. Set `VOCALIS_PUBLIC_DEMO=1` and `VOCALIS_DEMO_TENANT_ID=<tenant ID>` to permit the public browser demo. The demo limits connections and turns per IP; deploy behind a reverse proxy with additional rate controls. Open `http://localhost:8000` and allow microphone access. Hold the button to record; release to send. The server sends a cancellation message when a new turn interrupts playback. Browser audio is whole-turn PCM, and TTS playback starts after synthesis completes.
 
-### 5. Run the Server
+To add business knowledge:
+
 ```bash
-python app.py
+curl -X POST http://localhost:8000/api/knowledge -H 'x-api-key: YOUR_KEY' -H 'content-type: application/json' -d '{"title":"Hours","content":"We open Monday to Friday, 9 AM to 5 PM."}'
 ```
 
-You should see:
-```
-🔄 Loading Whisper model (tiny)...
-✅ Whisper model loaded.
-INFO:     Uvicorn running on http://0.0.0.0:8000
-```
+Authenticated endpoints include `/api/calls`, `/api/calls/{id}`, `/api/analytics`, `/api/knowledge`, `/api/appointments`, and `/api/leads`. OpenAPI docs are at `/docs`. Knowledge upload currently accepts text, not PDF. The browser demo is chat only; there is no admin dashboard yet. `static/index.html` and `legacy_app.py` retain the original prototype for reference and are not served by the new app.
 
-### 6. Open the App
-Navigate to: **http://localhost:8000**
+## Docker
 
----
-
-## 🎯 How to Use
-
-1. **Allow microphone access** when prompted by your browser.
-2. **Press and hold** the blue "Hold to Talk" button.
-3. **Speak naturally** — e.g., *"Hi, I'd like to book a teeth cleaning for tomorrow."*
-4. **Release** the button. Ava will:
-   - Transcribe your speech (Whisper)
-   - Think of a response (Groq LLM)
-   - Speak back to you (Edge TTS)
-   - If a booking is confirmed, update the dashboard
-
-5. **Watch the sidebar** — appointments and CRM leads update in real time.
-
-### Example Conversation Flow
-```
-You:  "Hello, I'd like to make an appointment."
-Ava:  "Of course! I'd be happy to help you book an appointment at Brightside Dental. May I have your name, please?"
-
-You:  "My name is David Chen."
-Ava:  "Nice to meet you, David. What service are you looking for? We offer general checkups, teeth cleaning, consultations, root canals, and whitening."
-
-You:  "I need a teeth cleaning."
-Ava:  "Great choice. When would you prefer to come in? We're open Monday through Friday, 9 AM to 5 PM."
-
-You:  "Tomorrow at 10 AM."
-Ava:  "Perfect! I've booked your teeth cleaning for tomorrow at 10 AM. Your appointment ID is APPT-0003. We look forward to seeing you at 123 Smile Street. Is there anything else I can help you with?"
-```
-
----
-
-## 📁 Project Structure
-
-```
-voice-receptionist/
-├── app.py                 # FastAPI backend (WebSockets, AI pipeline, mock CRM/Calendar)
-├── static/
-│   └── index.html         # Professional dark-themed frontend (WebRTC, dashboard)
-├── requirements.txt       # Python dependencies
-├── .env.example           # Environment variable template
-├── .gitignore             # Git ignore rules
-└── README.md              # This file
-```
-
----
-
-## 🔧 Customization Guide
-
-### Change the Business Context
-Edit the `SYSTEM_PROMPT` in `app.py` (line ~90):
-```python
-SYSTEM_PROMPT = """You are "Ava," a professional AI receptionist for [YOUR BUSINESS NAME]...
-"""
-```
-
-### Change Services & Pricing
-Update the services list inside `SYSTEM_PROMPT`:
-```python
-Services offered:
-- General Checkup ($50)
-- Teeth Cleaning ($80)
-- Consultation (Free)
-```
-
-### Switch TTS Voice
-In `app.py`, change the voice variable in `text_to_speech()`:
-```python
-voice = "en-US-AriaNeural"   # Female, US
-voice = "en-US-GuyNeural"    # Male, US
-voice = "en-GB-SoniaNeural"  # Female, UK
-```
-
-Or use the settings dropdown in the UI.
-
-### Use a Larger Whisper Model
-For better accuracy (slightly slower):
-```python
-# In app.py, line ~55
-whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
-# Options: tiny (fastest), base, small, medium, large-v3 (most accurate)
-```
-
-### Connect Real APIs
-Replace the mock classes with real integrations:
-
-**Google Calendar:**
-```python
-from googleapiclient.discovery import build
-# Use Google Calendar API to check real availability
-```
-
-**HubSpot CRM:**
-```python
-import hubspot
-# Use HubSpot API to create real contacts and deals
-```
-
-**Twilio (when ready to go live):**
-```python
-from twilio.rest import Client
-# Route real phone numbers to your WebSocket endpoint
-```
-
----
-
-## 💰 Monetization Strategy (The SaaS Cash Cow)
-
-This project is designed to be a **client magnet** on Upwork. Here's how to pitch it:
-
-### Upwork Job Titles to Target
-- *"Build AI phone receptionist for my clinic"*
-- *"Voice AI agent for appointment booking"*
-- *"Twilio + OpenAI real-time voice assistant"*
-- *"AI call center automation"*
-
-### Pricing Tiers You Can Offer
-| Tier | Features | Monthly Price |
-|------|----------|---------------|
-| **Starter** | 1 phone number, basic booking, email notifications | $300/mo |
-| **Pro** | 3 numbers, CRM sync, calendar integration, analytics | $750/mo |
-| **Enterprise** | Unlimited numbers, custom voice, priority support, SLA | $2,000+/mo |
-
-### One-Time Project Rates
-- **MVP Deployment:** $2,000 – $5,000
-- **Custom Integrations (Salesforce, HubSpot, Calendly):** +$1,500 each
-- **Custom Voice Cloning (ElevenLabs):** +$1,000
-- **Twilio Setup + Number Porting:** +$500
-
----
-
-## 🛠️ Tech Stack Deep Dive
-
-### Why These Choices?
-
-| Tech | Why It Was Chosen |
-|------|-------------------|
-| **FastAPI + WebSockets** | Native async support, handles concurrent calls effortlessly |
-| **faster-whisper (tiny)** | 39MB model, transcribes in <100ms on CPU, completely free |
-| **Groq (LLaMA 3 8B)** | 500+ tokens/sec — fastest inference on the market, generous free tier |
-| **edge-tts** | Uses Microsoft's Edge browser voices, no API key, sounds professional |
-| **WebRTC (browser)** | Zero-cost alternative to Twilio for portfolio demos |
-
-### Latency Breakdown
-| Step | Time |
-|------|------|
-| Audio capture + send | ~50ms |
-| Whisper transcription | ~100–200ms |
-| Groq LLM generation | ~100–300ms |
-| Edge TTS synthesis | ~200–400ms |
-| Audio playback | ~50ms |
-| **Total Roundtrip** | **~500–1000ms** |
-
-For production, switch to **Groq's Realtime API** or **OpenAI's Realtime API** with streaming to cut this to **<300ms**.
-
----
-
-## 🐛 Troubleshooting
-
-### 🔴 "Failed to build 'av'" or "av wheel build failed"
-
-This happens because `faster-whisper` depends on PyAV (`av`), which needs FFmpeg system libraries.
-
-**Option A — Use openai-whisper (RECOMMENDED, easiest):**
-The project now auto-detects and falls back to `openai-whisper` if `faster-whisper` is not installed. Just run:
 ```bash
-pip install -r requirements.txt
+docker compose up --build
 ```
-The `requirements.txt` uses `openai-whisper` by default — no system deps needed.
 
-**Option B — Install FFmpeg and use faster-whisper (fastest):**
+The Compose file runs a single API instance with a persistent SQLite volume. Set secrets in `.env` first. It is for local evaluation, not a horizontally scaled production deployment. A public HTTPS proxy with WebSocket support is needed for remote browser microphone use.
+
+## Phone setup
+
+Set `TWILIO_AUTH_TOKEN` and `VOCALIS_PUBLIC_BASE_URL` (the exact externally visible HTTPS origin). Bootstrap a tenant with `--phone-number +15551234567` and optionally `--transfer-number +15557654321`. Configure that Twilio number's **incoming voice webhook** as `POST https://your-domain/twilio/voice`. Twilio sends speech results to the signed `/twilio/gather` action. Signatures are checked before processing; repeated gather turns return the same response. This is a real phone integration when credentials, number, and public endpoint exist, but it is turn-based Twilio speech input and Twilio `<Say>` output, not bidirectional audio streaming. See [integrations](docs/INTEGRATIONS.md).
+
+## Evaluation and measured results
+
 ```bash
-# Ubuntu / Debian
-sudo apt-get update
-sudo apt-get install -y libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev pkg-config
-
-# macOS
-brew install ffmpeg pkg-config
-
-# Then install faster-whisper
-pip install faster-whisper==1.0.3
+pytest -q
 ```
-The code will auto-detect `faster-whisper` and use it for ~2x faster transcription.
 
-### "Microphone not working"
-- Ensure you're on `localhost` or `https` (browsers block mic on insecure origins)
-- Check browser permissions (click the lock icon in the address bar)
+At implementation time, **14 deterministic tests passed in the final local run** on the local host. This is test-suite runtime, not voice response latency. Live latency percentiles are populated only from completed turns in `/api/analytics`; there is no published production latency result or evaluation score. See [evaluation](docs/EVALUATION.md).
 
-### "Groq API error"
-- Verify your `GROQ_API_KEY` in `.env`
-- Check your Groq dashboard for rate limits
+## Key limits
 
-### "Whisper model download fails"
-- Ensure you have ~500MB free disk space (for torch + tiny model)
-- On first run, it auto-downloads from HuggingFace / PyTorch CDN
-
-### "Audio sounds choppy"
-- The `tiny` Whisper model is optimized for speed over accuracy
-- Upgrade to `base` or `small` for cleaner transcription
-
----
-
-## 📜 License
-
-MIT License — use it freely for client projects, portfolios, or SaaS products.
-
----
-
-## 🙋 About the Author
-
-Built as a portfolio piece to demonstrate expertise in:
-- Real-time AI systems
-- WebRTC & WebSocket architecture
-- LLM integration & prompt engineering
-- Full-stack Python development
-- SaaS product design
-
-**Ready to deploy?** Swap WebRTC for Twilio, mock APIs for real ones, and you have a production-grade voice AI platform.
-
----
-
-<p align="center"><strong>⭐ Star this repo if it helps you land your next $5K client!</strong></p>
+The API is a single-process SQLite pilot. There is no vector index, PDF parser, Next.js dashboard, model-judge evaluation, recording retention system, OAuth refresh, outbound calling, or streaming telephony audio. Google Calendar and HubSpot adapters need tenant-specific configuration and live validation. Production operation needs PostgreSQL, durable distributed idempotency, credential management, observability export, load tests, and privacy/consent review. See [deployment](docs/DEPLOYMENT.md) and [security](docs/SECURITY.md).
