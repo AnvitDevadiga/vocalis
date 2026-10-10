@@ -9,4 +9,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install fastapi httpx pytest pytest-asyncio
-      - run: pytest -q
+      - run: python -m pytest -q

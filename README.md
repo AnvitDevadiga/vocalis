@@ -1,6 +1,6 @@
 # Vocalis
 
-Repository: [AnvitDevadiga/Vocalis](https://github.com/AnvitDevadiga/Vocalis). Portfolio page: [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). The portfolio page is static; the voice backend is not hosted there.
+Repository: [AnvitDevadiga/vocalis](https://github.com/AnvitDevadiga/vocalis). Portfolio page: [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). The portfolio page is static; the voice backend is not hosted there.
 
 Vocalis is an **early multi-tenant voice-agent pilot**, evolved from a single-clinic prototype. It includes a browser microphone demo, Twilio inbound speech-turn integration, tenant-scoped call records, a small knowledge retriever, local appointment and lead tools, optional Google Calendar and HubSpot adapters, escalation records, and measured per-turn server timing. It is **not yet a production-ready real-time phone platform**; see [current state](docs/CURRENT_STATE.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
