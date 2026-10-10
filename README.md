@@ -1,6 +1,6 @@
 # Vocalis
 
-Repository: [AnvitDevadiga/Vocalis](https://github.com/AnvitDevadiga/Vocalis).
+Repository: [AnvitDevadiga/Vocalis](https://github.com/AnvitDevadiga/Vocalis). Portfolio page: [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). The portfolio page is static; the voice backend is not hosted there.
 
 Vocalis is an **early multi-tenant voice-agent pilot**, evolved from a single-clinic prototype. It includes a browser microphone demo, Twilio inbound speech-turn integration, tenant-scoped call records, a small knowledge retriever, local appointment and lead tools, optional Google Calendar and HubSpot adapters, escalation records, and measured per-turn server timing. It is **not yet a production-ready real-time phone platform**; see [current state](docs/CURRENT_STATE.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
@@ -48,6 +48,10 @@ curl -X POST http://localhost:8000/api/knowledge -H 'x-api-key: YOUR_KEY' -H 'co
 ```
 
 Authenticated endpoints include `/api/calls`, `/api/calls/{id}`, `/api/analytics`, `/api/knowledge`, `/api/appointments`, and `/api/leads`. OpenAPI docs are at `/docs`. Knowledge upload currently accepts text, not PDF. The browser demo is chat only; there is no admin dashboard yet. `static/index.html` and `legacy_app.py` retain the original prototype for reference and are not served by the new app.
+
+## GitHub Pages portfolio
+
+The static, resume-ready page lives in `site/index.html`. `.github/workflows/deploy-pages.yml` publishes that directory when `main` changes. In the repository settings, set Pages **Build and deployment → Source** to **GitHub Actions**. GitHub Pages cannot run FastAPI or WebSockets; the page labels the live voice demo as unavailable until a backend is hosted separately.
 
 ## Docker
 
