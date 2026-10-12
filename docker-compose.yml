@@ -1,9 +1,33 @@
 services:
   api:
     build: .
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "8000:8000"
     env_file: ${VOCALIS_ENV_FILE:-.env.example}
+    volumes:
+      - vocalis-data:/srv/vocalis/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+  crm-worker:
+    profiles: ["crm-worker"]
+    build: .
+    command: ["python", "-m", "vocalis.crm_worker"]
+    init: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    env_file: ${VOCALIS_ENV_FILE:-.env.example}
+    depends_on:
+      api:
+        condition: service_healthy
     volumes:
       - vocalis-data:/srv/vocalis/data
 volumes:

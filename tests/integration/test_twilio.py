@@ -13,9 +13,9 @@ def signature(url,params):
 
 class FakeEngine:
     def __init__(self,store): self.store=store
-    async def turn(self,tenant,call,text):
+    async def turn(self,tenant,call,text,commit=True):
         self.store.event(tenant,call,'fake_turn',{'text':text})
-        return {'text':'Acknowledged','escalation':None}
+        return {'text':'Acknowledged','escalation':None,'_state':{'history':[{'role':'user','content':text}]},'_turn_event':{'response_ms':1}}
 
 
 def test_retried_gather_is_idempotent(tmp_path,monkeypatch):
@@ -38,5 +38,10 @@ def test_retried_gather_is_idempotent(tmp_path,monkeypatch):
     second=client.post('/twilio/gather?turn=1',data=params,headers=headers)
     assert first.status_code==200
     assert second.text==first.text
+    assert sum(e['kind']=='fake_turn' for e in store.events(tenant,'CA123'))==1
+    assert store.call(tenant,'CA123')['state']['history'][0]['content']=='Hello'
+    params['SpeechResult']='Different delivery'
+    conflicting={'x-twilio-signature':signature(url,params)}
+    assert client.post('/twilio/gather?turn=1',data=params,headers=conflicting).status_code==409
     assert sum(e['kind']=='fake_turn' for e in store.events(tenant,'CA123'))==1
     assert client.post('/twilio/gather?turn=1',data=params).status_code==403

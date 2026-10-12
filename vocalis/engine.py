@@ -1,5 +1,8 @@
 """Provider boundaries and a deliberately conservative conversation runtime."""
 import asyncio
+import base64
+import hashlib
+import io
 import json
 import os
 import re
@@ -35,10 +38,10 @@ class WhisperSTT:
         self.model = None
 
     async def transcribe(self, pcm, sample_rate):
-        if len(pcm) > 16000 * 2 * 30:
-            raise ValueError('audio exceeds 30 seconds')
         if not 8000 <= sample_rate <= 48000 or len(pcm) % 2:
             raise ValueError('invalid PCM audio')
+        if len(pcm) > sample_rate * 2 * 30:
+            raise ValueError('audio exceeds 30 seconds')
         if self.model is None:
             try:
                 from faster_whisper import WhisperModel
@@ -56,6 +59,36 @@ class WhisperSTT:
             return await asyncio.wait_for(asyncio.to_thread(run), timeout=20)
         finally:
             os.unlink(path)
+
+
+class GroqWhisperSTT:
+    """Transcribe bounded browser audio through Groq without loading a local model."""
+    async def transcribe(self, pcm, sample_rate):
+        if not 8000 <= sample_rate <= 48000 or len(pcm) % 2:
+            raise ValueError('invalid PCM audio')
+        if len(pcm) > sample_rate * 2 * 30:
+            raise ValueError('audio exceeds 30 seconds')
+        key = os.getenv('GROQ_API_KEY')
+        if not key:
+            raise ProviderError('Groq transcription is not configured')
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer,'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(pcm)
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30,connect=5)) as client:
+            response = await client.post('https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization':f'Bearer {key}'},
+                data={'model':os.getenv('GROQ_STT_MODEL','whisper-large-v3-turbo'),
+                      'language':os.getenv('GROQ_STT_LANGUAGE','en'),'response_format':'json'},
+                files={'file':('speech.wav',wav_buffer.getvalue(),'audio/wav')})
+            response.raise_for_status()
+            result = response.json()
+        text = result.get('text') if isinstance(result,dict) else None
+        if not isinstance(text,str):
+            raise ProviderError('Groq transcription returned an invalid response')
+        return text.strip()
 
 
 class EdgeTTS:
@@ -100,7 +133,7 @@ class GoogleCalendar:
     def __init__(self, tenant_id):
         self.tenant_id = tenant_id
 
-    async def request(self, method, path, body=None, params=None):
+    async def request(self, method, path, body=None, params=None, headers=None):
         if self.tenant_id != os.getenv('GOOGLE_CALENDAR_TENANT_ID'):
             raise ProviderError('Google Calendar is not configured for this tenant')
         token = os.getenv('GOOGLE_CALENDAR_ACCESS_TOKEN')
@@ -110,16 +143,26 @@ class GoogleCalendar:
         from urllib.parse import quote
         url = 'https://www.googleapis.com/calendar/v3/calendars/' + quote(calendar_id, safe='') + path
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.request(method, url, headers={'Authorization':f'Bearer {token}'}, json=body, params=params)
+            request_headers = {'Authorization':f'Bearer {token}', **(headers or {})}
+            response = await client.request(method, url, headers=request_headers, json=body, params=params)
             response.raise_for_status()
             return response.json() if response.content else {}
 
-    async def available(self, start, end):
-        result = await self.request('GET','/events',params={'timeMin':start,'timeMax':end,'singleEvents':'true'})
-        return not any(item.get('status') != 'cancelled' for item in result.get('items',[]))
+    async def available(self, start, end, exclude_event_id=None):
+        params = {'timeMin':start,'timeMax':end,'singleEvents':'true','orderBy':'startTime','maxResults':2500}
+        for _ in range(20):
+            result = await self.request('GET','/events',params=params)
+            if any(item.get('status') != 'cancelled' and item.get('transparency') != 'transparent'
+                   and item.get('id') != exclude_event_id for item in result.get('items',[])):
+                return False
+            token = result.get('nextPageToken')
+            if not token:
+                return True
+            params['pageToken'] = token
+        raise ProviderError('Calendar availability exceeded the safe pagination limit')
 
     async def book(self, name, service, start, end, key):
-        event_id = __import__('hashlib').sha256((self.tenant_id+':'+key).encode()).hexdigest()
+        event_id = base64.b32hexencode(hashlib.sha256((self.tenant_id+':'+key).encode()).digest()).decode().lower().rstrip('=')
         try:
             existing = await self.request('GET', '/events/'+event_id)
             return {'ok':True,'external_id':existing['id'],'start_at':existing['start']['dateTime']}
@@ -136,6 +179,41 @@ class GoogleCalendar:
             event = await self.request('GET', '/events/'+event_id)
         return {'ok':True,'external_id':event['id'],'start_at':start}
 
+    async def cancel(self, event_id):
+        try:
+            await self.request('DELETE','/events/'+event_id,params={'sendUpdates':'all'})
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 404:
+                raise
+        return {'ok': True}
+
+    async def reschedule(self, event_id, start, end, key):
+        event = await self.request('GET','/events/'+event_id)
+        private = (event.get('extendedProperties') or {}).get('private') or {}
+        if private.get('vocalis_reschedule_key') == key:
+            return {'ok':True,'external_id':event_id}
+        if event.get('status') == 'cancelled':
+            return {'ok':False,'error':'appointment_cancelled'}
+        if not await self.available(start,end,exclude_event_id=event_id):
+            return {'ok':False,'error':'slot_unavailable'}
+        etag = event.get('etag')
+        if not etag:
+            raise ProviderError('Calendar event is missing an ETag')
+        private = {**private,'vocalis_reschedule_key':key}
+        body = {'start':{'dateTime':start},'end':{'dateTime':end},
+                'extendedProperties':{'private':private}}
+        try:
+            result = await self.request('PATCH','/events/'+event_id,body=body,headers={'If-Match':etag})
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 412:
+                raise
+            current = await self.request('GET','/events/'+event_id)
+            current_private = (current.get('extendedProperties') or {}).get('private') or {}
+            if current_private.get('vocalis_reschedule_key') != key:
+                return {'ok':False,'error':'event_changed'}
+            result = current
+        return {'ok':True,'external_id':result.get('id',event_id)}
+
 
 ESCALATION_TERMS = ('human', 'person', 'representative', 'emergency', 'chest pain', 'suicid', 'ambulance')
 INJECTION_TERMS = ('ignore previous instructions','reveal your prompt','system prompt')
@@ -145,7 +223,14 @@ class Engine:
     def __init__(self, store, llm=None, stt=None, tts=None):
         self.store = store
         self.llm = llm or GroqLLM()
-        self.stt = stt or WhisperSTT()
+        if stt is not None:
+            self.stt = stt
+        elif os.getenv('VOCALIS_STT_PROVIDER','local') == 'groq':
+            self.stt = GroqWhisperSTT()
+        elif os.getenv('VOCALIS_STT_PROVIDER','local') == 'local':
+            self.stt = WhisperSTT()
+        else:
+            raise ProviderError('VOCALIS_STT_PROVIDER must be local or groq')
         self.tts = tts or EdgeTTS()
 
     def retrieve(self, tenant_id, question):
@@ -162,32 +247,20 @@ class Engine:
         return sorted(results,key=lambda x:x['score'],reverse=True)[:3]
 
     async def confirmed_booking(self, tenant_id, call_id, draft):
-        import hashlib
+        from vocalis.booking import book_appointment
         start = datetime.fromisoformat(draft['start_at']).astimezone(timezone.utc)
         end = start + timedelta(minutes=draft['duration_minutes'])
         key = 'voice-book:' + hashlib.sha256((call_id+json.dumps(draft,sort_keys=True)).encode()).hexdigest()
         self.store.event(tenant_id,call_id,'tool_started',{'tool':'book_appointment'})
         try:
-            external_id = None
-            if os.getenv('GOOGLE_CALENDAR_TENANT_ID') == tenant_id:
-                external = await GoogleCalendar(tenant_id).book(draft['name'],draft['service'],start.isoformat(),end.isoformat(),key)
-                if not external['ok']:
-                    result = external
-                else:
-                    external_id = external['external_id']
-                    result = self.store.book(tenant_id,draft['name'],draft['phone'],draft['service'],start.isoformat(),end.isoformat(),key)
-            else:
-                result = self.store.book(tenant_id,draft['name'],draft['phone'],draft['service'],start.isoformat(),end.isoformat(),key)
-            if result['ok'] and external_id:
-                with self.store.connect() as db:
-                    db.execute('UPDATE appointments SET external_id=? WHERE tenant_id=? AND id=?',(external_id,tenant_id,result['appointment_id']))
+            result = await book_appointment(self.store,tenant_id,draft['name'],draft['phone'],draft['service'],start.isoformat(),end.isoformat(),key)
             self.store.event(tenant_id,call_id,'tool_completed',{'tool':'book_appointment','ok':result['ok']})
             return result
         except Exception as exc:
             self.store.event(tenant_id,call_id,'tool_completed',{'tool':'book_appointment','ok':False,'error':type(exc).__name__})
             return {'ok':False,'error':'calendar_unavailable'}
 
-    async def turn(self, tenant_id, call_id, user_text, is_current=lambda: True):
+    async def turn(self, tenant_id, call_id, user_text, is_current=lambda: True, commit=True):
         call = self.store.call(tenant_id, call_id)
         if not call or call['status'] != 'active':
             raise KeyError('active call not found')
@@ -208,9 +281,14 @@ class Engine:
             if result['ok']:
                 state['appointment'] = result
                 reply = f"Your appointment is confirmed for {result['start_at']}. Confirmation ID: {result['appointment_id']}."
+                state.pop('appointment_draft',None)
+            elif result.get('error') in ('calendar_outcome_unknown','booking_pending'):
+                reply = 'I cannot confirm the appointment yet. The calendar result is pending verification. A human should follow up before you rely on this booking.'
+                state['escalation'] = {'reason':'calendar_outcome_unknown','status':'pending_followup'}
+                self.store.event(tenant_id,call_id,'escalation_requested',{'mode':'followup_required','reason':'calendar_outcome_unknown'})
             else:
                 reply = 'I could not confirm that appointment. The calendar is unavailable or the slot has been taken. Please choose another time.'
-            state.pop('appointment_draft',None)
+                state.pop('appointment_draft',None)
             usage = {}
         elif draft and rejection:
             state.pop('appointment_draft',None)
@@ -264,6 +342,13 @@ class Engine:
         state['last_evidence'] = [{k:v for k,v in item.items() if k != 'text'} for item in evidence]
         if not is_current():
             raise asyncio.CancelledError()
-        self.store.update_state(tenant_id,call_id,state)
-        self.store.event(tenant_id,call_id,'turn_completed',{'response_ms':elapsed,'tokens':usage,'evidence':state['last_evidence']})
-        return {'text':reply,'metrics':{'end_to_end_response_ms':elapsed},'evidence':state['last_evidence'],'escalation':state.get('escalation')}
+        turn_event = {'response_ms':elapsed,'tokens':usage,'evidence':state['last_evidence']}
+        if commit:
+            self.store.update_state(tenant_id,call_id,state)
+            self.store.event(tenant_id,call_id,'turn_completed',turn_event)
+        result = {'text':reply,'metrics':{'end_to_end_response_ms':elapsed},'evidence':state['last_evidence'],
+                  'escalation':state.get('escalation')}
+        if not commit:
+            result['_state'] = state
+            result['_turn_event'] = turn_event
+        return result

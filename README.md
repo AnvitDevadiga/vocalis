@@ -12,7 +12,7 @@ flowchart LR
   Hook --> Runtime
   Runtime --> RAG[Tenant-scoped lexical retrieval]
   Runtime --> Groq[Groq LLM]
-  Runtime --> DB[(SQLite local pilot)]
+  Runtime --> DB[(SQLite local / PostgreSQL hosted)]
   WS --> Whisper[Local faster-whisper]
   WS --> Edge[Edge TTS]
   API[Authenticated API] --> DB
@@ -22,11 +22,11 @@ flowchart LR
 
 ## Capabilities and demo
 
-The served browser demo is at `/` after local setup. No hosted live URL or screenshot is available. Supported actions today: tenant-scoped text knowledge upload/retrieval, browser conversation, inbound Twilio speech turns, local appointment booking/cancellation, local lead upsert, optional Google Calendar booking, optional HubSpot contact upsert, and human escalation records. Voice booking asks the caller to confirm the exact draft before creating an appointment.
+The public portfolio page is [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). It is a static showcase; no live voice API or hosted browser-call demo is available. The browser demo runs only after local setup. Supported actions today: tenant-scoped text knowledge upload/retrieval, browser conversation, inbound Twilio speech turns, local appointment booking/cancellation/rescheduling, local lead upsert, optional Google Calendar availability, booking, cancellation, and rescheduling, optional HubSpot contact upsert, and human escalation records. Voice booking asks the caller to confirm the exact draft before creating an appointment.
 
 ## Local setup
 
-Requires Python 3.12+ and a Groq API key for generated responses. Audio transcription requires the `faster-whisper` model download on first use. TTS uses Edge TTS. Text conversation works without microphone dependencies, but without a Groq key it returns an explicit outage response.
+Requires Python 3.12+ and a Groq API key for generated responses. Audio transcription uses local `faster-whisper` by default or Groq Whisper when `VOCALIS_STT_PROVIDER=groq`; the hosted preview uses Groq to avoid local model memory usage. TTS uses Edge TTS. Text conversation works without microphone dependencies, but without a Groq key it returns an explicit outage response.
 
 ```bash
 python3 -m venv .venv
@@ -36,10 +36,12 @@ cp .env.example .env
 # Fill GROQ_API_KEY in .env, then export the environment (or use a process manager).
 set -a; source .env; set +a
 python -m vocalis.admin 'Example Business'
-uvicorn app:app --host 127.0.0.1 --port 8000
+python -m vocalis.start
 ```
 
-The bootstrap prints a tenant ID and API key once. Store them securely. Set `VOCALIS_PUBLIC_DEMO=1` and `VOCALIS_DEMO_TENANT_ID=<tenant ID>` to permit the public browser demo. The demo limits connections and turns per IP; deploy behind a reverse proxy with additional rate controls. Open `http://localhost:8000` and allow microphone access. Hold the button to record; release to send. The server sends a cancellation message when a new turn interrupts playback. Browser audio is whole-turn PCM, and TTS playback starts after synthesis completes.
+SQLite is the default. For PostgreSQL, set `VOCALIS_DATABASE_URL` in the environment before creating a tenant; run `python -m alembic upgrade head` first, or use the Docker startup module, which applies migrations automatically.
+
+The bootstrap prints a tenant ID and API key once. Store them securely. Set `VOCALIS_PUBLIC_DEMO=1` and `VOCALIS_DEMO_TENANT_ID=<tenant ID>` to permit the public browser demo. The demo limits connections and turns per IP; deploy behind a reverse proxy with additional rate controls. Open `http://localhost:8000` and allow microphone access. The browser demo asks for explicit privacy consent before creating a call record. Hold the button to record; release to send. Audio is capped at 30 seconds; WebSocket audio remains whole-turn PCM and TTS playback starts after synthesis completes.
 
 To add business knowledge:
 
@@ -56,10 +58,14 @@ The static, resume-ready page lives in `site/index.html`. `.github/workflows/dep
 ## Docker
 
 ```bash
-docker compose up --build
+VOCALIS_ENV_FILE=.env docker compose up --build
 ```
 
-The Compose file runs a single API instance with a persistent SQLite volume. Set secrets in `.env` first. It is for local evaluation, not a horizontally scaled production deployment. A public HTTPS proxy with WebSocket support is needed for remote browser microphone use.
+The default Compose profile runs one API instance with a persistent SQLite volume. Set secrets in `.env` first. To use PostgreSQL, set `VOCALIS_DATABASE_URL` to a reachable PostgreSQL DSN; startup applies Alembic migrations. SQLite mode is for local evaluation and one API replica. A public HTTPS proxy with WebSocket support is needed for remote browser microphone use.
+
+`render.yaml` is a free-tier preview Blueprint for the API. It requires a PostgreSQL `VOCALIS_DATABASE_URL` and a `GROQ_API_KEY`; when both are configured, startup creates the restricted public-demo tenant. Free web instances sleep and have ephemeral filesystems, so this is suitable for portfolio preview traffic, not production availability. See the [deployment guide](docs/DEPLOYMENT.md) for the GitHub Pages connection steps.
+
+For an existing SQLite database, stop the API and CRM worker, set `VOCALIS_DATABASE_URL` to an empty migrated PostgreSQL database, then run `python -m vocalis.migrate_sqlite --source data/vocalis.db --backup data/vocalis.pre-postgres.sqlite`. The command creates a protected online backup, reads SQLite without modifying it, and refuses a non-empty PostgreSQL target. See the [migration runbook](docs/DEPLOYMENT.md).
 
 ## Phone setup
 
@@ -68,11 +74,12 @@ Set `TWILIO_AUTH_TOKEN` and `VOCALIS_PUBLIC_BASE_URL` (the exact externally visi
 ## Evaluation and measured results
 
 ```bash
-pytest -q
+python3 -m pytest -q
+python3 -m vocalis.evaluate
 ```
 
-At implementation time, **14 deterministic tests passed in the final local run** on the local host. This is test-suite runtime, not voice response latency. Live latency percentiles are populated only from completed turns in `/api/analytics`; there is no published production latency result or evaluation score. See [evaluation](docs/EVALUATION.md).
+The last fully provisioned local run passed **49 deterministic tests**, including disposable PostgreSQL migration and SQLite transfer runs. The current checkout passes **54 tests**, with the PostgreSQL integration module skipped because `psycopg` is unavailable in this environment, plus **7 of 7 offline evaluation scenarios**. These are local checks, not live voice quality or latency scores. Live latency percentiles are populated only from completed turns in `/api/analytics`; there is no published production latency result or evaluation score. See [evaluation](docs/EVALUATION.md) and the [phased roadmap](docs/ROADMAP.md).
 
 ## Key limits
 
-The API is a single-process SQLite pilot. There is no vector index, PDF parser, Next.js dashboard, model-judge evaluation, recording retention system, OAuth refresh, outbound calling, or streaming telephony audio. Google Calendar and HubSpot adapters need tenant-specific configuration and live validation. Production operation needs PostgreSQL, durable distributed idempotency, credential management, observability export, load tests, and privacy/consent review. See [deployment](docs/DEPLOYMENT.md) and [security](docs/SECURITY.md).
+The default local deployment is a single-process SQLite pilot; PostgreSQL storage and Alembic migrations are available for hosted deployment when `VOCALIS_DATABASE_URL` is configured. Lead capture is committed locally with an optional HubSpot sync job; jobs have leased worker processing, retry backoff, and a tenant-authenticated retry endpoint. Run the optional worker with `python -m vocalis.crm_worker` or Compose profile `crm-worker`. Call records and their events/state are automatically pruned after the configured retention period (default 30 days); appointment, lead, and knowledge lifecycles still require separate policies. Private SQLite and PostgreSQL backup tooling is available through `python -m vocalis.backup --output <new-file>`. There is no vector index, PDF parser, Next.js dashboard, model-judge evaluation, OAuth refresh, outbound calling, or streaming telephony audio. Google Calendar and HubSpot adapters need tenant-specific configuration and live validation. Production operation still needs credential management, observability export, load tests, backup restore drills, and privacy review. See [deployment](docs/DEPLOYMENT.md) and [security](docs/SECURITY.md).

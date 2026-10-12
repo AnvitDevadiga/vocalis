@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: vocalis-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: VOCALIS_DATABASE_URL
+        sync: false
+      - key: VOCALIS_AUTO_MIGRATE
+        value: "1"
+      - key: VOCALIS_PUBLIC_DEMO
+        value: "1"
+      - key: VOCALIS_DEMO_TENANT_NAME
+        value: Vocalis Portfolio Demo
+      - key: VOCALIS_ALLOWED_ORIGINS
+        value: https://anvitdevadiga.github.io
+      - key: VOCALIS_CALL_RETENTION_DAYS
+        value: "30"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: VOCALIS_STT_PROVIDER
+        value: groq

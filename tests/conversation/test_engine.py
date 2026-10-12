@@ -99,3 +99,75 @@ async def test_llm_cannot_claim_unverified_booking(tmp_path):
     result=await Engine(store,llm=FalseBookingLLM()).turn(tenant,call,'Can you book me?')
     assert 'cannot confirm' in result['text']
     assert store.appointments(tenant)==[]
+
+
+@pytest.mark.asyncio
+async def test_voice_never_confirms_uncertain_calendar_result(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    import vocalis.booking as booking
+
+    store = Store(tmp_path/'db.sqlite')
+    tenant = store.create_tenant('A','a')
+    call = store.create_call(tenant,'browser')
+    start = (datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
+    engine = Engine(store,llm=BookingLLM(start))
+    await engine.turn(tenant,call,'Book a checkup')
+
+    async def uncertain(*args):
+        return {'ok':False,'error':'calendar_outcome_unknown'}
+
+    monkeypatch.setattr(booking,'book_appointment',uncertain)
+    response = await engine.turn(tenant,call,'confirm')
+    assert 'cannot confirm' in response['text'].lower()
+    assert response['escalation']['reason'] == 'calendar_outcome_unknown'
+    assert store.call(tenant,call)['state']['appointment_draft']
+    assert store.appointments(tenant) == []
+
+
+@pytest.mark.asyncio
+async def test_groq_stt_sends_bounded_wav_without_logging_key(monkeypatch):
+    import io
+    import wave
+    import httpx
+    from vocalis.engine import GroqWhisperSTT
+
+    captured={}
+    class FakeResponse:
+        def raise_for_status(self): pass
+        def json(self): return {'text':' hello from groq '}
+    class FakeClient:
+        def __init__(self,**kwargs): captured['timeout']=kwargs['timeout']
+        async def __aenter__(self): return self
+        async def __aexit__(self,*_args): pass
+        async def post(self,url,**kwargs):
+            captured.update(url=url,**kwargs)
+            return FakeResponse()
+
+    monkeypatch.setattr(httpx,'AsyncClient',FakeClient)
+    monkeypatch.setenv('GROQ_API_KEY','private-test-key')
+    result=await GroqWhisperSTT().transcribe(b'\x01\x00'*16000,16000)
+    assert result=='hello from groq'
+    assert captured['url'].endswith('/audio/transcriptions')
+    assert captured['headers']=={'Authorization':'Bearer private-test-key'}
+    assert captured['data']['model']=='whisper-large-v3-turbo'
+    filename,contents,mime=captured['files']['file']
+    assert (filename,mime)==('speech.wav','audio/wav')
+    with wave.open(io.BytesIO(contents),'rb') as wav:
+        assert (wav.getnchannels(),wav.getframerate(),wav.getnframes())==(1,16000,16000)
+
+
+@pytest.mark.asyncio
+async def test_groq_stt_rejects_oversize_audio_before_network(monkeypatch):
+    from vocalis.engine import GroqWhisperSTT
+    monkeypatch.setenv('GROQ_API_KEY','test-key')
+    with pytest.raises(ValueError,match='30 seconds'):
+        await GroqWhisperSTT().transcribe(b'\0\0'*(16000*31),16000)
+
+
+def test_engine_selects_configured_stt_provider(tmp_path,monkeypatch):
+    from vocalis.engine import GroqWhisperSTT, WhisperSTT
+    store=Store(tmp_path/'db.sqlite')
+    monkeypatch.setenv('VOCALIS_STT_PROVIDER','groq')
+    assert isinstance(Engine(store).stt,GroqWhisperSTT)
+    monkeypatch.setenv('VOCALIS_STT_PROVIDER','local')
+    assert isinstance(Engine(store).stt,WhisperSTT)

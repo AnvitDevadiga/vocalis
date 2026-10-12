@@ -3,10 +3,25 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vocalis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vocalis_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      VOCALIS_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vocalis_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install fastapi httpx pytest pytest-asyncio
+      - run: pip install fastapi httpx pytest pytest-asyncio sqlalchemy alembic 'psycopg[binary]'
       - run: python -m pytest -q

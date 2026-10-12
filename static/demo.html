@@ -1,14 +1,203 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vocalis | Talk to the agent</title><style>
-:root{font-family:system-ui,sans-serif;color:#edf1f7;background:#0b1220}body{margin:0;min-height:100vh;display:grid;place-items:center}main{width:min(720px,92vw);background:#142036;border:1px solid #34445f;border-radius:20px;padding:28px}h1{margin-top:0}#log{height:340px;overflow:auto;background:#0c1629;border-radius:12px;padding:16px;margin:16px 0}.msg{margin:10px 0}.you{color:#8bd3ff}.agent{color:#a5efc7}.system{color:#d1c795}form{display:flex;gap:8px}input{flex:1}input,button{border:1px solid #526582;border-radius:10px;padding:12px;background:#182842;color:white}button{cursor:pointer}button:disabled{opacity:.5}small{color:#aebbd0}#mic.recording{background:#a52f52}</style></head><body><main><h1>Talk to Vocalis</h1><p>Browser voice demo. Responses and timing reflect this session. The microphone sends up to 30 seconds of audio per turn.</p><div id="status">Connecting…</div><div id="log" aria-live="polite"></div><form id="form"><input id="text" maxlength="2000" placeholder="Ask a question" aria-label="Message"><button>Send</button></form><p><button id="mic" type="button">Hold to talk</button> <button id="stop" type="button">Interrupt</button></p><small id="metrics">No measured turns yet.</small></main><script>
-let ws, audio, recording=false, chunks=[], stream, context, processor, source, currentTurn=0;
-const log=document.querySelector('#log'); const status=document.querySelector('#status');
-function line(kind,text){const div=document.createElement('div');div.className='msg '+kind;div.textContent=(kind==='you'?'You: ':kind==='agent'?'Vocalis: ':'')+text;log.appendChild(div);log.scrollTop=log.scrollHeight;}
-function stopAudio(){if(audio){audio.pause();audio.src='';audio=null;}}
-function connect(){const scheme=location.protocol==='https:'?'wss':'ws';ws=new WebSocket(scheme+'://'+location.host+'/ws/demo');ws.onopen=()=>status.textContent='Connected';ws.onclose=()=>{status.textContent='Disconnected. Reconnecting…';setTimeout(connect,2500)};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==='ready')line('system',m.text);if(m.type==='cancel_audio'){currentTurn=m.turn_id;stopAudio()}if(m.type==='transcription')line('you',m.text);if(m.type==='response'&&m.turn_id===currentTurn){line('agent',m.text);document.querySelector('#metrics').textContent='Server response: '+m.metrics.end_to_end_response_ms+' ms';}if(m.type==='audio'&&m.turn_id===currentTurn){const bytes=Uint8Array.from(atob(m.audio),c=>c.charCodeAt(0));audio=new Audio(URL.createObjectURL(new Blob([bytes],{type:'audio/mpeg'})));audio.play().catch(()=>line('system','Audio playback was blocked.'));audio.onended=()=>{URL.revokeObjectURL(audio.src);audio=null}}if(m.type==='error')line('system',m.text)}}
-function send(type,payload){if(ws?.readyState!==1){line('system','Connection unavailable.');return}stopAudio();ws.send(JSON.stringify({type,...payload}))}
-document.querySelector('#form').onsubmit=e=>{e.preventDefault();const field=document.querySelector('#text');const value=field.value.trim();if(value){line('you',value);send('text',{text:value});field.value=''}};
+:root{font-family:system-ui,sans-serif;color:#edf1f7;background:#0b1220}body{margin:0;min-height:100vh;display:grid;place-items:center}main{width:min(720px,92vw);background:#142036;border:1px solid #34445f;border-radius:20px;padding:28px}h1{margin-top:0}#log{height:340px;overflow:auto;background:#0c1629;border-radius:12px;padding:16px;margin:16px 0}.msg{margin:10px 0}.you{color:#8bd3ff}.agent{color:#a5efc7}.system{color:#d1c795}form{display:flex;gap:8px}input{flex:1}input,button{border:1px solid #526582;border-radius:10px;padding:12px;background:#182842;color:white}button{cursor:pointer}button:disabled{opacity:.5}small{color:#aebbd0}#mic.recording{background:#a52f52}#privacy{padding:14px;border:1px solid #526582;border-radius:10px;margin:14px 0}#privacy label{display:flex;align-items:flex-start;gap:8px}#privacy input{flex:none;margin-top:4px}</style></head><body><main><h1>Talk to Vocalis</h1><p>Browser voice demo. Responses and timing reflect this session. The microphone sends up to 30 seconds of audio per turn.</p><div id="status" role="status">Connecting…</div><section id="privacy" hidden><p id="privacy-text"></p><label><input id="consent-check" type="checkbox" disabled>I have read this notice and agree to continue.</label><button id="agree" type="button" disabled>Agree and join</button></section><div id="log" aria-live="polite"></div><form id="form"><input id="text" maxlength="2000" placeholder="Ask a question" aria-label="Message" disabled><button type="submit" disabled>Send</button></form><p><button id="mic" type="button" aria-pressed="false" disabled>Hold to talk</button> <button id="stop" type="button" disabled>Interrupt</button></p><small id="metrics">No measured turns yet.</small></main><script>
+let ws, audio, audioUrl, reconnectTimer, reconnectDelay=1000;
+let recording=false, micHeld=false, micStarting=false, chunks=[], capturedSamples=0;
+let stream, context, processor, source, mute;
+let currentTurn=0, sessionReady=false, noticeVersion=null;
+const MAX_RECORDING_SECONDS=30;
+const log=document.querySelector('#log');
+const status=document.querySelector('#status');
+const mic=document.querySelector('#mic');
+const privacy=document.querySelector('#privacy');
+const consentCheck=document.querySelector('#consent-check');
+const agreeButton=document.querySelector('#agree');
+const messageInput=document.querySelector('#text');
+const sendButton=document.querySelector('#form button[type="submit"]');
+const stopButton=document.querySelector('#stop');
+
+function setReady(ready){
+  sessionReady=ready;
+  messageInput.disabled=!ready;
+  sendButton.disabled=!ready;
+  mic.disabled=!ready;
+  stopButton.disabled=!ready;
+}
+
+function line(kind,text){
+  const div=document.createElement('div');
+  div.className='msg '+kind;
+  div.textContent=(kind==='you'?'You: ':kind==='agent'?'Vocalis: ':'')+text;
+  log.appendChild(div);
+  log.scrollTop=log.scrollHeight;
+}
+function stopAudio(){
+  if(!audio)return;
+  audio.pause();
+  audio.removeAttribute('src');
+  audio.load();
+  if(audioUrl)URL.revokeObjectURL(audioUrl);
+  audio=null;
+  audioUrl=null;
+}
+function connect(){
+  if(ws&&(ws.readyState===WebSocket.CONNECTING||ws.readyState===WebSocket.OPEN))return;
+  clearTimeout(reconnectTimer);
+  const scheme=location.protocol==='https:'?'wss':'ws';
+  const socket=new WebSocket(scheme+'://'+location.host+'/ws/demo');
+  ws=socket;
+  status.textContent='Connecting…';
+  socket.onopen=()=>{
+    if(ws!==socket)return;
+    reconnectDelay=1000;
+    status.textContent='Connected';
+  };
+  socket.onclose=event=>{
+    if(ws!==socket)return;
+    setReady(false);
+    privacy.hidden=true;
+    consentCheck.checked=false;
+    consentCheck.disabled=true;
+    agreeButton.disabled=true;
+    noticeVersion=null;
+    status.textContent='Disconnected. Reconnecting…';
+    if(recording||micStarting)finish();
+    if(event.code===1008){status.textContent='Connection was not accepted. Reload to try again.';return}
+    reconnectTimer=setTimeout(connect,reconnectDelay);
+    reconnectDelay=Math.min(Math.round(reconnectDelay*1.8),15000);
+  };
+  socket.onerror=()=>{if(ws===socket)status.textContent='Connection problem…'};
+  socket.onmessage=event=>{
+    if(ws!==socket)return;
+    let message;
+    try{message=JSON.parse(event.data)}catch{return line('system','Received an invalid server message.')}
+    if(message.type==='consent_required'){
+      noticeVersion=message.notice_version;
+      document.querySelector('#privacy-text').textContent=message.text;
+      consentCheck.disabled=false;
+      privacy.hidden=false;
+      status.textContent='Review the privacy notice to continue';
+    }
+    if(message.type==='ready'){
+      privacy.hidden=true;
+      consentCheck.disabled=true;
+      setReady(true);
+      line('system',message.text);
+    }
+    if(message.type==='cancel_audio'){currentTurn=message.turn_id;stopAudio()}
+    if(message.type==='transcription')line('you',message.text);
+    if(message.type==='response'&&message.turn_id===currentTurn){
+      line('agent',message.text);
+      document.querySelector('#metrics').textContent='Server response: '+message.metrics.end_to_end_response_ms+' ms';
+    }
+    if(message.type==='audio'&&message.turn_id===currentTurn){
+      stopAudio();
+      const bytes=Uint8Array.from(atob(message.audio),c=>c.charCodeAt(0));
+      audioUrl=URL.createObjectURL(new Blob([bytes],{type:'audio/mpeg'}));
+      const player=new Audio(audioUrl);
+      audio=player;
+      player.onended=()=>{if(audio===player)stopAudio()};
+      player.play().catch(()=>line('system','Audio playback was blocked.'));
+    }
+    if(message.type==='error')line('system',message.text);
+  };
+}
+function send(type,payload){
+  if(!sessionReady){line('system','Accept the privacy notice before starting a conversation.');return false}
+  if(ws?.readyState!==WebSocket.OPEN){line('system','Connection unavailable. Please wait for it to reconnect.');return false}
+  stopAudio();
+  ws.send(JSON.stringify({type,...payload}));
+  return true;
+}
+document.querySelector('#form').onsubmit=event=>{
+  event.preventDefault();
+  const field=document.querySelector('#text');
+  const value=field.value.trim();
+  if(value&&send('text',{text:value})){line('you',value);field.value=''}
+};
 document.querySelector('#stop').onclick=()=>send('interrupt',{});
-const mic=document.querySelector('#mic');async function start(){if(recording)return;try{stream=await navigator.mediaDevices.getUserMedia({audio:true});context=new AudioContext();source=context.createMediaStreamSource(stream);processor=context.createScriptProcessor(4096,1,1);chunks=[];processor.onaudioprocess=e=>{if(recording){const samples=e.inputBuffer.getChannelData(0),out=new Int16Array(samples.length);for(let i=0;i<samples.length;i++)out[i]=Math.max(-32768,Math.min(32767,Math.round(samples[i]*32767)));chunks.push(out)}};source.connect(processor);processor.connect(context.destination);recording=true;mic.classList.add('recording');stopAudio();send('interrupt',{});}catch(e){line('system','Microphone access failed. Use a secure origin or localhost.')}}
-function finish(){if(!recording)return;recording=false;mic.classList.remove('recording');processor.disconnect();source.disconnect();stream.getTracks().forEach(t=>t.stop());const count=chunks.reduce((n,c)=>n+c.length,0);const merged=new Int16Array(count);let at=0;for(const c of chunks){merged.set(c,at);at+=c.length}if(count>0&&count/context.sampleRate<=30){let s='';const bytes=new Uint8Array(merged.buffer);for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));send('audio',{audio:btoa(s),sample_rate:context.sampleRate})}else if(count)line('system','Recording must be 30 seconds or shorter.');context.close()}
-mic.addEventListener('pointerdown',start);window.addEventListener('pointerup',finish);mic.addEventListener('keydown',e=>{if(e.code==='Space')start()});mic.addEventListener('keyup',e=>{if(e.code==='Space')finish()});connect();
+consentCheck.onchange=()=>{agreeButton.disabled=!consentCheck.checked||ws?.readyState!==WebSocket.OPEN};
+agreeButton.onclick=()=>{
+  if(!consentCheck.checked||ws?.readyState!==WebSocket.OPEN||!noticeVersion)return;
+  agreeButton.disabled=true;
+  ws.send(JSON.stringify({type:'consent',accepted:true,notice_version:noticeVersion}));
+  status.textContent='Joining…';
+};
+
+function releaseMicrophone(){
+  if(processor){processor.onaudioprocess=null;processor.disconnect();processor=null}
+  if(source){source.disconnect();source=null}
+  if(mute){mute.disconnect();mute=null}
+  if(stream){stream.getTracks().forEach(track=>track.stop());stream=null}
+  if(context){const old=context;context=null;old.close().catch(()=>{})}
+  mic.classList.remove('recording');
+  mic.setAttribute('aria-pressed','false');
+}
+async function start(){
+  if(!sessionReady||micHeld||recording||micStarting)return;
+  micHeld=true;
+  micStarting=true;
+  try{
+    context=new AudioContext({sampleRate:48000});
+    const newStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(!micHeld){newStream.getTracks().forEach(track=>track.stop());releaseMicrophone();return}
+    stream=newStream;
+    source=context.createMediaStreamSource(stream);
+    processor=context.createScriptProcessor(4096,1,1);
+    mute=context.createGain();
+    mute.gain.value=0;
+    chunks=[];
+    capturedSamples=0;
+    const maxSamples=Math.floor(context.sampleRate*MAX_RECORDING_SECONDS);
+    processor.onaudioprocess=event=>{
+      if(!recording)return;
+      const input=event.inputBuffer.getChannelData(0);
+      const count=Math.min(input.length,maxSamples-capturedSamples);
+      if(count>0){
+        const output=new Int16Array(count);
+        for(let i=0;i<count;i++)output[i]=Math.max(-32768,Math.min(32767,Math.round(input[i]*32767)));
+        chunks.push(output);
+        capturedSamples+=count;
+      }
+      if(capturedSamples>=maxSamples){line('system','Recording reached the 30-second limit.');finish()}
+    };
+    source.connect(processor);
+    processor.connect(mute);
+    mute.connect(context.destination);
+    recording=true;
+    mic.classList.add('recording');
+    mic.setAttribute('aria-pressed','true');
+    stopAudio();
+    send('interrupt',{});
+  }catch{
+    micHeld=false;
+    releaseMicrophone();
+    line('system','Microphone access failed. Use a secure origin or localhost.');
+  }finally{
+    micStarting=false;
+  }
+}
+function finish(){
+  micHeld=false;
+  if(!recording){if(micStarting)return;releaseMicrophone();return}
+  recording=false;
+  const sampleRate=context.sampleRate;
+  const merged=new Int16Array(capturedSamples);
+  let offset=0;
+  for(const chunk of chunks){merged.set(chunk,offset);offset+=chunk.length}
+  const count=capturedSamples;
+  chunks=[];
+  releaseMicrophone();
+  if(!count)return;
+  if(sampleRate<8000||sampleRate>48000){line('system','This device audio sample rate is unsupported.');return}
+  let binary='';
+  const bytes=new Uint8Array(merged.buffer);
+  for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+  send('audio',{audio:btoa(binary),sample_rate:sampleRate});
+}
+mic.addEventListener('pointerdown',event=>{event.preventDefault();start()});
+window.addEventListener('pointerup',finish);
+window.addEventListener('pointercancel',finish);
+mic.addEventListener('keydown',event=>{if(event.code==='Space'){event.preventDefault();start()}});
+mic.addEventListener('keyup',event=>{if(event.code==='Space'){event.preventDefault();finish()}});
+connect();
 </script></body></html>
