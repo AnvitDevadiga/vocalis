@@ -132,19 +132,64 @@ class HubSpotCRM:
 class GoogleCalendar:
     def __init__(self, tenant_id):
         self.tenant_id = tenant_id
+        self._access_token = None
+        self._token_expires_at = 0.0
+
+    def _credentials(self):
+        refresh_names = ('GOOGLE_CALENDAR_CLIENT_ID', 'GOOGLE_CALENDAR_CLIENT_SECRET',
+                         'GOOGLE_CALENDAR_REFRESH_TOKEN')
+        refresh = {name: os.getenv(name) for name in refresh_names}
+        if any(refresh.values()):
+            if not all(refresh.values()):
+                raise ProviderError('Google Calendar refresh credentials are incomplete')
+            return refresh
+        if os.getenv('GOOGLE_CALENDAR_ACCESS_TOKEN'):
+            return None
+        raise ProviderError('Google Calendar credentials are not configured')
+
+    def validate_configuration(self):
+        if self.tenant_id != os.getenv('GOOGLE_CALENDAR_TENANT_ID') or not os.getenv('GOOGLE_CALENDAR_ID'):
+            raise ProviderError('Google Calendar is not configured for this tenant')
+        return self._credentials()
+
+    async def _token(self, client, refresh):
+        if refresh is None:
+            return os.environ['GOOGLE_CALENDAR_ACCESS_TOKEN']
+        if self._access_token and time.monotonic() < self._token_expires_at:
+            return self._access_token
+        response = await client.post('https://oauth2.googleapis.com/token', data={
+            'client_id': refresh['GOOGLE_CALENDAR_CLIENT_ID'],
+            'client_secret': refresh['GOOGLE_CALENDAR_CLIENT_SECRET'],
+            'refresh_token': refresh['GOOGLE_CALENDAR_REFRESH_TOKEN'],
+            'grant_type': 'refresh_token',
+        })
+        response.raise_for_status()
+        payload = response.json()
+        token = payload.get('access_token') if isinstance(payload, dict) else None
+        if not isinstance(token, str) or not token:
+            raise ProviderError('Google Calendar token refresh returned no access token')
+        try:
+            lifetime = float(payload.get('expires_in', 3600))
+        except (TypeError, ValueError) as exc:
+            raise ProviderError('Google Calendar token refresh returned invalid expiry') from exc
+        self._access_token = token
+        self._token_expires_at = time.monotonic() + max(0, lifetime - 60)
+        return token
 
     async def request(self, method, path, body=None, params=None, headers=None):
-        if self.tenant_id != os.getenv('GOOGLE_CALENDAR_TENANT_ID'):
-            raise ProviderError('Google Calendar is not configured for this tenant')
-        token = os.getenv('GOOGLE_CALENDAR_ACCESS_TOKEN')
         calendar_id = os.getenv('GOOGLE_CALENDAR_ID')
-        if not token or not calendar_id:
-            raise ProviderError('Google Calendar is not configured')
+        refresh = self.validate_configuration()
         from urllib.parse import quote
         url = 'https://www.googleapis.com/calendar/v3/calendars/' + quote(calendar_id, safe='') + path
         async with httpx.AsyncClient(timeout=10) as client:
+            token = await self._token(client, refresh)
             request_headers = {'Authorization':f'Bearer {token}', **(headers or {})}
             response = await client.request(method, url, headers=request_headers, json=body, params=params)
+            if response.status_code == 401 and refresh is not None:
+                self._access_token = None
+                token = await self._token(client, refresh)
+                request_headers['Authorization'] = f'Bearer {token}'
+                response = await client.request(method, url, headers=request_headers, json=body, params=params)
             response.raise_for_status()
             return response.json() if response.content else {}
 
@@ -225,9 +270,9 @@ class Engine:
         self.llm = llm or GroqLLM()
         if stt is not None:
             self.stt = stt
-        elif os.getenv('VOCALIS_STT_PROVIDER','local') == 'groq':
+        elif os.getenv('VOCALIS_STT_PROVIDER','groq') == 'groq':
             self.stt = GroqWhisperSTT()
-        elif os.getenv('VOCALIS_STT_PROVIDER','local') == 'local':
+        elif os.getenv('VOCALIS_STT_PROVIDER','groq') == 'local':
             self.stt = WhisperSTT()
         else:
             raise ProviderError('VOCALIS_STT_PROVIDER must be local or groq')

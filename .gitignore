@@ -9,3 +9,5 @@ data/
 .DS_Store
 .neon
 node_modules/
+.agents/skills/
+skills-lock.json

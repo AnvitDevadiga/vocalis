@@ -23,17 +23,17 @@
   <header><div class="wrap nav"><a class="brand" href="#top" aria-label="Vocalis home"><span class="mark">V</span> Vocalis</a><nav class="navlinks" aria-label="Main navigation"><a href="#capabilities">Capabilities</a><a href="#architecture">Architecture</a><a href="https://github.com/AnvitDevadiga/vocalis">GitHub ↗</a></nav></div></header>
   <main id="top" class="wrap">
     <div class="hero">
-      <div><span class="eyebrow">Voice AI engineering prototype</span><h1>Every conversation<br><span class="gradient">should be accountable.</span></h1><p class="lead">Vocalis explores the systems behind a business phone agent: tenant-scoped calls, grounded knowledge, confirmation-gated booking, escalation, and inspectable events.</p><div class="actions"><a class="button primary" href="https://github.com/AnvitDevadiga/vocalis">Explore the code ↗</a><a class="button secondary" href="#architecture">How it works</a></div><p class="fine">Public project preview · The live voice backend is not hosted yet.</p></div>
+      <div><span class="eyebrow">Voice AI engineering prototype</span><h1>Every conversation<br><span class="gradient">should be accountable.</span></h1><p class="lead">Vocalis explores the systems behind a business phone agent: tenant-scoped calls, grounded knowledge, confirmation-gated booking, escalation, and inspectable events.</p><div class="actions"><a class="button primary" href="https://github.com/AnvitDevadiga/vocalis">Explore the code ↗</a><a class="button secondary" href="#architecture">How it works</a></div><p class="fine">Public project preview · Live voice demo hosted on Render.</p></div>
       <div class="console" aria-label="Illustration of a Vocalis call timeline"><div class="console-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><div class="console-body"><div class="call-label">CONVERSATION TIMELINE</div><div class="wave" aria-hidden="true"><span style="--h:24px"></span><span style="--h:50px"></span><span style="--h:72px"></span><span style="--h:38px"></span><span style="--h:88px"></span><span style="--h:58px"></span><span style="--h:29px"></span><span style="--h:66px"></span><span style="--h:96px"></span><span style="--h:45px"></span><span style="--h:72px"></span><span style="--h:31px"></span><span style="--h:62px"></span><span style="--h:39px"></span><span style="--h:77px"></span></div><div class="log"><div><b>01</b> Speech detected</div><div><b>02</b> Tenant knowledge retrieved</div><div><b>03</b> Response and tool events recorded</div></div><div class="console-foot">Illustrative flow · no live call or latency shown</div></div></div>
     </div>
     <section id="capabilities"><div class="section-head"><h2>Built around operational reality.</h2><p>The current repository is a working pilot with explicit boundaries. These pieces are implemented and covered by deterministic tests.</p></div><div class="grid"><article class="card"><div class="icon">◎</div><h3>Browser conversation</h3><p>Microphone and text input over WebSockets, with cancellation of in-flight turns and browser playback.</p></article><article class="card"><div class="icon">↗</div><h3>Inbound phone adapter</h3><p>Signed Twilio speech webhooks, retry handling, and a configurable human transfer number.</p></article><article class="card"><div class="icon">▦</div><h3>Tenant-scoped records</h3><p>Persistent calls, events, documents, appointments, and leads with scoped API access.</p></article><article class="card"><div class="icon">⌕</div><h3>Knowledge retrieval</h3><p>Tenant-isolated text retrieval with source metadata and conservative fallback when facts are unavailable.</p></article><article class="card"><div class="icon">✓</div><h3>Safer booking</h3><p>Voice bookings require a caller confirmation and a successful calendar operation before confirmation.</p></article><article class="card"><div class="icon">◇</div><h3>Offline evaluation</h3><p>Deterministic isolation, interruption, webhook, and booking tests plus seeded conversation fixtures.</p></article></div></section>
-    <section id="architecture"><div class="section-head"><h2>Traceable from speech to response.</h2><p>A small service architecture keeps provider calls and tenant data behind explicit boundaries.</p></div><div class="flow"><div class="step"><small>01 · INPUT</small><strong>Browser or phone</strong></div><div class="step"><small>02 · VOICE</small><strong>Transcribe speech</strong></div><div class="step"><small>03 · CONTEXT</small><strong>Retrieve knowledge</strong></div><div class="step"><small>04 · DECIDE</small><strong>Generate or escalate</strong></div><div class="step"><small>05 · RECORD</small><strong>Persist call events</strong></div></div><p class="detail">FastAPI + WebSockets · Groq · faster-whisper · Edge TTS · tenant-scoped SQLite pilot · optional Google Calendar and HubSpot adapters</p></section>
-    <section id="demo"><div class="status"><div><h3 id="demo-title">Live voice demo is being deployed separately</h3><p id="demo-description">GitHub Pages hosts this project page. The conversational demo needs a persistent FastAPI backend. Live provider calls and production latency have not been verified.</p><div class="actions" style="margin-top:18px"><a id="demo-link" class="button secondary" href="https://github.com/AnvitDevadiga/vocalis" hidden>Open voice demo ↗</a></div></div><span id="demo-badge" class="badge">Project preview</span></div></section>
+    <section id="architecture"><div class="section-head"><h2>Traceable from speech to response.</h2><p>A small service architecture keeps provider calls and tenant data behind explicit boundaries.</p></div><div class="flow"><div class="step"><small>01 · INPUT</small><strong>Browser or phone</strong></div><div class="step"><small>02 · VOICE</small><strong>Transcribe speech</strong></div><div class="step"><small>03 · CONTEXT</small><strong>Retrieve knowledge</strong></div><div class="step"><small>04 · DECIDE</small><strong>Generate or escalate</strong></div><div class="step"><small>05 · RECORD</small><strong>Persist call events</strong></div></div><p class="detail">FastAPI + WebSockets · Groq speech and language · Edge TTS · Neon Postgres · optional Google Calendar and HubSpot adapters</p></section>
+    <section id="demo"><div class="status"><div><h3 id="demo-title">Try the live Vocalis voice demo</h3><p id="demo-description">The free backend may need a moment to wake. The demo asks for consent before a conversation begins.</p><div class="actions" style="margin-top:18px"><a id="demo-link" class="button secondary" href="https://vocalis-api-z6sd.onrender.com/">Open voice demo ↗</a></div></div><span id="demo-badge" class="badge">Checking backend</span></div></section>
   </main>
   <footer><div class="wrap footer-inner"><span>Vocalis · Voice AI platform prototype</span><a href="https://github.com/AnvitDevadiga/vocalis">Source and documentation ↗</a></div></footer>
   <script src="config.js"></script>
   <script>
-    const backend=new URLSearchParams(location.search).get('backend')||window.VOCALIS_BACKEND_URL;
+    const backend=window.VOCALIS_BACKEND_URL;
     if(backend){
       try{
         const base=new URL(backend);
@@ -43,14 +43,14 @@
           if(!response.ok)throw new Error('backend unavailable');
           const data=await response.json();
           if(data.public_demo!==true)throw new Error('demo disabled');
-          const link=document.querySelector('#demo-link');
-          link.href=new URL('/',base).href;
-          link.hidden=false;
-          document.querySelector('#demo-title').textContent='Try the live Vocalis voice demo';
           document.querySelector('#demo-description').textContent='The backend is online. The demo asks for consent before a conversation begins.';
           document.querySelector('#demo-badge').textContent='Backend online';
-        }).catch(()=>{});
-      }catch{}
+        }).catch(()=>{
+          document.querySelector('#demo-badge').textContent='Waking or unavailable';
+        });
+      }catch{
+        document.querySelector('#demo-badge').textContent='Status unavailable';
+      }
     }
   </script>
 </body>

@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from vocalis.booking import book_appointment
 from vocalis.appointments import reschedule_appointment
 from vocalis.crm import sync_claim
-from vocalis.engine import Engine, GoogleCalendar, HubSpotCRM
+from vocalis.engine import Engine, GoogleCalendar, HubSpotCRM, ProviderError
 from vocalis.store import Store, request_fingerprint
 
 DB_PATH = os.getenv('VOCALIS_DATABASE_URL') or os.getenv('VOCALIS_DB_PATH', 'data/vocalis.db')
@@ -390,7 +390,7 @@ async def book(data: BookingIn, tenant=Depends(auth)):
     except ValueError as exc:
         raise HTTPException(409,str(exc)) from exc
     if not result['ok']:
-        status = 503 if result['error'] in ('calendar_outcome_unknown','booking_pending') else 409
+        status = 503 if result['error'] in ('calendar_outcome_unknown','booking_pending','calendar_not_configured') else 409
         raise HTTPException(status,result['error'])
     return result
 
@@ -410,6 +410,11 @@ async def cancel(appointment_id: str, idempotency_key: str = Query(min_length=8,
         if appointment['external_id']:
             if os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant['id']:
                 raise HTTPException(503,'Google Calendar is not configured for this tenant')
+            calendar = GoogleCalendar(tenant['id'])
+            try:
+                calendar.validate_configuration()
+            except ProviderError as exc:
+                raise HTTPException(503,'Google Calendar is not configured for this tenant') from exc
             try:
                 claim = store.reserve_appointment_operation(tenant['id'],appointment_id,'cancel',idempotency_key)
             except ValueError as exc:
@@ -422,7 +427,7 @@ async def cancel(appointment_id: str, idempotency_key: str = Query(min_length=8,
                 raise HTTPException(503,'Another appointment operation is pending; retry later')
             else:
                 try:
-                    await GoogleCalendar(tenant['id']).cancel(appointment['external_id'])
+                    await calendar.cancel(appointment['external_id'])
                     result = store.finish_appointment_operation(tenant['id'],idempotency_key,claim['token'])
                 except Exception as exc:
                     raise HTTPException(503,'Calendar cancellation outcome is unknown; retry with the same idempotency key') from exc

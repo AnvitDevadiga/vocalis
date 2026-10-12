@@ -19,6 +19,9 @@ async def test_uncertain_calendar_result_keeps_slot_and_retry_recovers(tmp_path,
         def __init__(self, tenant_id):
             assert tenant_id == tenant
 
+        def validate_configuration(self):
+            pass
+
         async def book(self, name, service, start_at, end_at, key):
             calls.append(key)
             if len(calls) == 1:
@@ -59,6 +62,9 @@ async def test_calendar_rejection_releases_slot_and_is_idempotent(tmp_path, monk
         def __init__(self, tenant_id):
             pass
 
+        def validate_configuration(self):
+            pass
+
         async def book(self, *args):
             return {'ok': False, 'error': 'slot_unavailable'}
 
@@ -69,3 +75,19 @@ async def test_calendar_rejection_releases_slot_and_is_idempotent(tmp_path, monk
     assert await booking.book_appointment(*args) == first
     assert store.appointments(tenant)[0]['status'] == 'rejected'
     assert store.book(tenant, 'Other', '5559876', 'Checkup', start, end, 'other-key')['ok']
+
+
+@pytest.mark.asyncio
+async def test_missing_calendar_credentials_do_not_reserve_a_slot(tmp_path, monkeypatch):
+    store = Store(tmp_path/'db.sqlite')
+    tenant = store.create_tenant('Clinic', 'key')
+    monkeypatch.setenv('GOOGLE_CALENDAR_TENANT_ID', tenant)
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID', 'primary')
+    for name in ('GOOGLE_CALENDAR_ACCESS_TOKEN', 'GOOGLE_CALENDAR_CLIENT_ID',
+                 'GOOGLE_CALENDAR_CLIENT_SECRET', 'GOOGLE_CALENDAR_REFRESH_TOKEN'):
+        monkeypatch.delenv(name, raising=False)
+    start = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=2, minutes=30)).isoformat()
+    result = await booking.book_appointment(store, tenant, 'Alex', '5551234', 'Checkup', start, end, 'missing-key')
+    assert result == {'ok': False, 'error': 'calendar_not_configured'}
+    assert store.appointments(tenant) == []

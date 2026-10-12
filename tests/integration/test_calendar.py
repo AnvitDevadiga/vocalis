@@ -3,11 +3,54 @@ import re
 import httpx
 import pytest
 
-from vocalis.engine import GoogleCalendar
+from vocalis.engine import GoogleCalendar, ProviderError
 import app as module
 from fastapi.testclient import TestClient
 from vocalis.store import Store
 from vocalis import appointments as appointment_service
+
+
+@pytest.mark.asyncio
+async def test_google_calendar_refreshes_and_retries_one_unauthorized_request(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_TENANT_ID', 'tenant-a')
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID', 'business@example.com')
+    monkeypatch.setenv('GOOGLE_CALENDAR_CLIENT_ID', 'client-id')
+    monkeypatch.setenv('GOOGLE_CALENDAR_CLIENT_SECRET', 'client-secret')
+    monkeypatch.setenv('GOOGLE_CALENDAR_REFRESH_TOKEN', 'refresh-token')
+    monkeypatch.delenv('GOOGLE_CALENDAR_ACCESS_TOKEN', raising=False)
+    seen = {'refreshes': 0, 'api_tokens': []}
+
+    def respond(request):
+        if request.url.host == 'oauth2.googleapis.com':
+            seen['refreshes'] += 1
+            assert b'grant_type=refresh_token' in request.content
+            return httpx.Response(200, json={'access_token': f'token-{seen["refreshes"]}', 'expires_in': 3600})
+        assert request.url.host == 'www.googleapis.com'
+        assert 'business%40example.com' in str(request.url)
+        token = request.headers['Authorization']
+        seen['api_tokens'].append(token)
+        if token == 'Bearer token-1':
+            return httpx.Response(401, json={'error': 'expired'})
+        return httpx.Response(200, json={'items': []})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda **kwargs: real_client(transport=httpx.MockTransport(respond), **kwargs))
+    calendar = GoogleCalendar('tenant-a')
+    assert await calendar.request('GET', '/events') == {'items': []}
+    assert await calendar.request('GET', '/events') == {'items': []}
+    assert seen == {'refreshes': 2, 'api_tokens': ['Bearer token-1', 'Bearer token-2', 'Bearer token-2']}
+
+
+@pytest.mark.asyncio
+async def test_google_calendar_rejects_partial_refresh_configuration(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_TENANT_ID', 'tenant-a')
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID', 'primary')
+    monkeypatch.setenv('GOOGLE_CALENDAR_CLIENT_ID', 'client-id')
+    monkeypatch.delenv('GOOGLE_CALENDAR_CLIENT_SECRET', raising=False)
+    monkeypatch.delenv('GOOGLE_CALENDAR_REFRESH_TOKEN', raising=False)
+    monkeypatch.setenv('GOOGLE_CALENDAR_ACCESS_TOKEN', 'old-access-token')
+    with pytest.raises(ProviderError, match='incomplete'):
+        await GoogleCalendar('tenant-a').request('GET', '/events')
 
 
 @pytest.mark.asyncio
@@ -132,6 +175,9 @@ async def test_external_reschedule_recovers_after_provider_timeout(tmp_path, mon
         def __init__(self, tenant_id):
             assert tenant_id == tenant
 
+        def validate_configuration(self):
+            pass
+
         async def reschedule(self, event_id, start_at, end_at, key):
             state['calls'] += 1
             if state['key'] == key:
@@ -205,6 +251,9 @@ def test_external_calendar_cancel_recovers_after_lost_response(tmp_path, monkeyp
     class FakeCalendar:
         def __init__(self, tenant_id):
             assert tenant_id == tenant
+
+        def validate_configuration(self):
+            pass
 
         async def cancel(self, event_id):
             assert event_id == 'google-event-1'

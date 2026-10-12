@@ -1,6 +1,6 @@
 # Vocalis
 
-Repository: [AnvitDevadiga/vocalis](https://github.com/AnvitDevadiga/vocalis). Portfolio page: [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). The portfolio page is static; the voice backend is not hosted there.
+Repository: [AnvitDevadiga/vocalis](https://github.com/AnvitDevadiga/vocalis). Portfolio page: [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). Live browser demo and API: [vocalis-api-z6sd.onrender.com](https://vocalis-api-z6sd.onrender.com/). The portfolio page is static and connects to the separately hosted backend.
 
 Vocalis is an **early multi-tenant voice-agent pilot**, evolved from a single-clinic prototype. It includes a browser microphone demo, Twilio inbound speech-turn integration, tenant-scoped call records, a small knowledge retriever, local appointment and lead tools, optional Google Calendar and HubSpot adapters, escalation records, and measured per-turn server timing. It is **not yet a production-ready real-time phone platform**; see [current state](docs/CURRENT_STATE.md) and [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
@@ -13,7 +13,7 @@ flowchart LR
   Runtime --> RAG[Tenant-scoped lexical retrieval]
   Runtime --> Groq[Groq LLM]
   Runtime --> DB[(SQLite local / PostgreSQL hosted)]
-  WS --> Whisper[Local faster-whisper]
+  WS --> Whisper[Groq Whisper hosted / local faster-whisper]
   WS --> Edge[Edge TTS]
   API[Authenticated API] --> DB
   API --> Google[Optional Google Calendar]
@@ -22,11 +22,11 @@ flowchart LR
 
 ## Capabilities and demo
 
-The public portfolio page is [anvitdevadiga.github.io/vocalis](https://anvitdevadiga.github.io/vocalis/). It is a static showcase; no live voice API or hosted browser-call demo is available. The browser demo runs only after local setup. Supported actions today: tenant-scoped text knowledge upload/retrieval, browser conversation, inbound Twilio speech turns, local appointment booking/cancellation/rescheduling, local lead upsert, optional Google Calendar availability, booking, cancellation, and rescheduling, optional HubSpot contact upsert, and human escalation records. Voice booking asks the caller to confirm the exact draft before creating an appointment.
+The public portfolio page links to the live browser demo on Render. The demo uses Neon Postgres and Groq on free tiers; the first request after inactivity may be slow. Google Calendar, HubSpot, and phone calls are optional integrations and are not connected to the hosted public demo. Supported actions in the backend include tenant-scoped text knowledge upload/retrieval, browser conversation, inbound Twilio speech turns, local appointment booking/cancellation/rescheduling, local lead upsert, optional Google Calendar availability, booking, cancellation, and rescheduling, optional HubSpot contact upsert, and human escalation records. Voice booking asks the caller to confirm the exact draft before creating an appointment.
 
 ## Local setup
 
-Requires Python 3.12+ and a Groq API key for generated responses. Audio transcription uses local `faster-whisper` by default or Groq Whisper when `VOCALIS_STT_PROVIDER=groq`; the hosted preview uses Groq to avoid local model memory usage. TTS uses Edge TTS. Text conversation works without microphone dependencies, but without a Groq key it returns an explicit outage response.
+Requires Python 3.12+ and a Groq API key for generated responses. Audio transcription uses Groq Whisper by default. Set `VOCALIS_STT_PROVIDER=local` for local `faster-whisper` after installing the development dependencies; the production image omits that large local model package. TTS uses Edge TTS. Text conversation works without microphone dependencies, but without a Groq key it returns an explicit outage response.
 
 ```bash
 python3 -m venv .venv
@@ -49,11 +49,11 @@ To add business knowledge:
 curl -X POST http://localhost:8000/api/knowledge -H 'x-api-key: YOUR_KEY' -H 'content-type: application/json' -d '{"title":"Hours","content":"We open Monday to Friday, 9 AM to 5 PM."}'
 ```
 
-Authenticated endpoints include `/api/calls`, `/api/calls/{id}`, `/api/analytics`, `/api/knowledge`, `/api/appointments`, and `/api/leads`. OpenAPI docs are at `/docs`. Knowledge upload currently accepts text, not PDF. The browser demo is chat only; there is no admin dashboard yet. `static/index.html` and `legacy_app.py` retain the original prototype for reference and are not served by the new app.
+Authenticated endpoints include `/api/calls`, `/api/calls/{id}`, `/api/analytics`, `/api/knowledge`, `/api/appointments`, and `/api/leads`. OpenAPI docs are at `/docs`. Knowledge upload currently accepts text, not PDF. The browser demo supports text and voice conversation; there is no admin dashboard yet. The unused original prototype files are available in Git history.
 
 ## GitHub Pages portfolio
 
-The static, resume-ready page lives in `site/index.html`. `.github/workflows/deploy-pages.yml` publishes that directory when `main` changes. In the repository settings, set Pages **Build and deployment → Source** to **GitHub Actions**. GitHub Pages cannot run FastAPI or WebSockets; the page labels the live voice demo as unavailable until a backend is hosted separately.
+The static, resume-ready page lives in `site/index.html`. `.github/workflows/deploy-pages.yml` publishes that directory when `main` changes. GitHub Pages runs the portfolio and checks the Render API health endpoint before offering the live demo link. FastAPI and WebSockets run on Render.
 
 ## Docker
 
@@ -78,8 +78,8 @@ python3 -m pytest -q
 python3 -m vocalis.evaluate
 ```
 
-The last fully provisioned local run passed **49 deterministic tests**, including disposable PostgreSQL migration and SQLite transfer runs. The current checkout passes **54 tests**, with the PostgreSQL integration module skipped because `psycopg` is unavailable in this environment, plus **7 of 7 offline evaluation scenarios**. These are local checks, not live voice quality or latency scores. Live latency percentiles are populated only from completed turns in `/api/analytics`; there is no published production latency result or evaluation score. See [evaluation](docs/EVALUATION.md) and the [phased roadmap](docs/ROADMAP.md).
+The current local checkout passes **62 tests**, with one PostgreSQL integration test skipped because the disposable test database URL is not configured, plus **7 of 7 offline evaluation scenarios**. CI runs the PostgreSQL test against a disposable database. These checks are not live voice quality or latency scores. Live latency percentiles are populated only from completed turns in `/api/analytics`; there is no published production latency result or evaluation score. See [evaluation](docs/EVALUATION.md) and the [phased roadmap](docs/ROADMAP.md).
 
 ## Key limits
 
-The default local deployment is a single-process SQLite pilot; PostgreSQL storage and Alembic migrations are available for hosted deployment when `VOCALIS_DATABASE_URL` is configured. Lead capture is committed locally with an optional HubSpot sync job; jobs have leased worker processing, retry backoff, and a tenant-authenticated retry endpoint. Run the optional worker with `python -m vocalis.crm_worker` or Compose profile `crm-worker`. Call records and their events/state are automatically pruned after the configured retention period (default 30 days); appointment, lead, and knowledge lifecycles still require separate policies. Private SQLite and PostgreSQL backup tooling is available through `python -m vocalis.backup --output <new-file>`. There is no vector index, PDF parser, Next.js dashboard, model-judge evaluation, OAuth refresh, outbound calling, or streaming telephony audio. Google Calendar and HubSpot adapters need tenant-specific configuration and live validation. Production operation still needs credential management, observability export, load tests, backup restore drills, and privacy review. See [deployment](docs/DEPLOYMENT.md) and [security](docs/SECURITY.md).
+The default local deployment is a single-process SQLite pilot; the hosted preview uses Neon Postgres with Alembic migrations. Lead capture is committed locally with an optional HubSpot sync job; jobs have leased worker processing, retry backoff, and a tenant-authenticated retry endpoint. Run the optional worker with `python -m vocalis.crm_worker` or Compose profile `crm-worker`. Call records and their events/state are automatically pruned after the configured retention period (default 30 days); appointment, lead, and knowledge lifecycles still require separate policies. Private SQLite and PostgreSQL backup tooling is available through `python -m vocalis.backup --output <new-file>`. There is no vector index, PDF parser, Next.js dashboard, model-judge evaluation, outbound calling, or streaming telephony audio. Google Calendar supports OAuth refresh credentials but still needs tenant-specific setup and live validation; HubSpot also needs provider setup. Production operation still needs credential management, observability export, load tests, backup restore drills, and privacy review. See [deployment](docs/DEPLOYMENT.md) and [security](docs/SECURITY.md).

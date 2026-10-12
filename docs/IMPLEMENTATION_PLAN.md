@@ -15,5 +15,5 @@
 4. Add PDF ingestion, embedding/vector retrieval, citations/grounding verification, deletion, and per-tenant index controls.
 5. Build the Next.js administration app with identity, RBAC, call details, knowledge/integration settings, and operational analytics.
 6. Add seeded multi-turn simulation, deterministic scoring, optional model judges, human review, and CI thresholds. Collect real provider traces before claiming performance.
-7. Add secret vault, OAuth refresh, phone recording/consent controls, PII redaction, distributed per-tenant rate limiting, abuse controls, and security review. Browser demo consent and PII-safe call-retention logs are implemented.
+7. Add tenant-scoped secret storage, HubSpot OAuth refresh, phone recording/consent controls, PII redaction, distributed per-tenant rate limiting, abuse controls, and security review. Browser demo consent, PII-safe call-retention logs, and single-tenant Google Calendar token refresh are implemented.
 8. Validate live Twilio, Google Calendar, HubSpot, Groq, Whisper, TTS, Docker deployment, and failure modes in a staging environment.

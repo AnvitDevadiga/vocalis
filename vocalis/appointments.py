@@ -2,7 +2,7 @@
 
 import os
 
-from vocalis.engine import GoogleCalendar
+from vocalis.engine import GoogleCalendar, ProviderError
 
 
 async def reschedule_appointment(store, tenant_id, appointment_id, start_at, end_at, key):
@@ -22,8 +22,14 @@ async def reschedule_appointment(store, tenant_id, appointment_id, start_at, end
         if os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id:
             store.release_appointment_operation(tenant_id,key,claim['token'])
             return {'ok':False,'error':'calendar_not_configured'}
+        calendar = GoogleCalendar(tenant_id)
         try:
-            result = await GoogleCalendar(tenant_id).reschedule(external_id,start_at,end_at,key)
+            calendar.validate_configuration()
+        except ProviderError:
+            store.release_appointment_operation(tenant_id,key,claim['token'])
+            return {'ok':False,'error':'calendar_not_configured'}
+        try:
+            result = await calendar.reschedule(external_id,start_at,end_at,key)
         except Exception:
             return {'ok':False,'error':'calendar_outcome_unknown'}
         if not result['ok']:

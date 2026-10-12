@@ -2,7 +2,7 @@
 
 import os
 
-from vocalis.engine import GoogleCalendar
+from vocalis.engine import GoogleCalendar, ProviderError
 
 
 async def book_appointment(store, tenant_id, name, phone, service, start_at, end_at, key):
@@ -13,6 +13,12 @@ async def book_appointment(store, tenant_id, name, phone, service, start_at, end
     if os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id:
         return store.book(tenant_id, name, phone, service, start_at, end_at, key)
 
+    calendar = GoogleCalendar(tenant_id)
+    try:
+        calendar.validate_configuration()
+    except ProviderError:
+        return {'ok': False, 'error': 'calendar_not_configured'}
+
     reservation = store.reserve_external_booking(tenant_id, name, phone, service, start_at, end_at, key)
     if not reservation['ok']:
         return {'ok': False, 'error': reservation.get('error', 'slot_unavailable')}
@@ -20,7 +26,7 @@ async def book_appointment(store, tenant_id, name, phone, service, start_at, end
         return {'ok': False, 'error': 'booking_pending'}
 
     try:
-        external = await GoogleCalendar(tenant_id).book(name, service, start_at, end_at, key)
+        external = await calendar.book(name, service, start_at, end_at, key)
     except Exception:
         # The provider may have succeeded before a timeout. Keep the reservation;
         # retrying this key later first checks the deterministic provider event ID.
