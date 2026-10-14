@@ -15,6 +15,8 @@ services:
         value: "1"
       - key: VOCALIS_PUBLIC_TENANT_NAME
         value: Vocalis
+      - key: VOCALIS_PUBLIC_TENANT_ID
+        value: 987d4cc7-da4a-5472-b5ae-8963cb1a36c2
       - key: VOCALIS_ALLOWED_ORIGINS
         value: https://anvitdevadiga.github.io
       - key: VOCALIS_CALL_RETENTION_DAYS
