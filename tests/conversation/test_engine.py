@@ -77,13 +77,29 @@ async def test_voice_does_not_confirm_taken_slot(tmp_path):
     start=(datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
     engine=Engine(store,llm=BookingLLM(start))
     first=store.create_call(tenant,'browser')
-    await engine.turn(tenant,first,'Book this for Alex')
+    booked=await engine.turn(tenant,first,'Book this for Alex')
+    assert 'Please confirm' in booked['text']
     await engine.turn(tenant,first,'confirm')
     second=store.create_call(tenant,'browser')
-    await engine.turn(tenant,second,'Book this for Alex')
-    result=await engine.turn(tenant,second,'confirm')
-    assert 'could not confirm' in result['text']
+    result=await engine.turn(tenant,second,'Book this for Alex')
+    assert 'not available' in result['text']
+    assert 'Please confirm' not in result['text']
     assert len(store.appointments(tenant))==1
+
+
+@pytest.mark.asyncio
+async def test_public_demo_does_not_offer_booking_without_calendar(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    store=Store(tmp_path/'db.sqlite')
+    tenant=store.create_tenant('Vocalis Portfolio Demo','key')
+    call=store.create_call(tenant,'browser')
+    start=(datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
+    monkeypatch.setenv('VOCALIS_PUBLIC_DEMO','1')
+    monkeypatch.setenv('VOCALIS_DEMO_TENANT_ID',tenant)
+    monkeypatch.delenv('GOOGLE_CALENDAR_TENANT_ID',raising=False)
+    result=await Engine(store,llm=BookingLLM(start)).turn(tenant,call,'Please book this meeting')
+    assert 'cannot verify calendar availability' in result['text'].lower()
+    assert 'appointment_draft' not in store.call(tenant,call)['state']
 
 
 class FalseBookingLLM:

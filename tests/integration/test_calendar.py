@@ -58,7 +58,7 @@ async def test_google_event_id_is_valid_and_retries_reuse_it(monkeypatch):
     calendar = GoogleCalendar('tenant-a')
     created = []
 
-    async def fake_request(method, path, body=None, params=None):
+    async def fake_request(method, path, body=None, params=None, calendar_id=None):
         if method == 'GET' and path.startswith('/events/'):
             if created:
                 return created[0]
@@ -69,6 +69,8 @@ async def test_google_event_id_is_valid_and_retries_reuse_it(monkeypatch):
             return {'items': []}
         assert method == 'POST'
         assert re.fullmatch(r'[0-9a-v]{5,1024}', body['id'])
+        assert body['reminders'] == {'useDefault':False,'overrides':[
+            {'method':'popup','minutes':1440},{'method':'popup','minutes':120}]}
         created.append({'id': body['id'], 'start': body['start']})
         return created[0]
 
@@ -81,10 +83,12 @@ async def test_google_event_id_is_valid_and_retries_reuse_it(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_calendar_availability_paginates_and_excludes_current_event(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID','primary')
+    monkeypatch.delenv('GOOGLE_CALENDAR_BUSY_IDS',raising=False)
     calendar = GoogleCalendar('tenant-a')
     requested = []
 
-    async def fake_request(method, path, body=None, params=None):
+    async def fake_request(method, path, body=None, params=None, calendar_id=None):
         requested.append(dict(params))
         if not params.get('pageToken'):
             return {'items':[{'id':'same-event','status':'confirmed'}],'nextPageToken':'next'}
@@ -99,9 +103,11 @@ async def test_calendar_availability_paginates_and_excludes_current_event(monkey
 
 @pytest.mark.asyncio
 async def test_calendar_availability_ignores_cancelled_and_transparent_events(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID','primary')
+    monkeypatch.delenv('GOOGLE_CALENDAR_BUSY_IDS',raising=False)
     calendar = GoogleCalendar('tenant-a')
 
-    async def fake_request(method, path, body=None, params=None):
+    async def fake_request(method, path, body=None, params=None, calendar_id=None):
         return {'items':[{'id':'cancelled','status':'cancelled'},
                          {'id':'free','status':'confirmed','transparency':'transparent'}]}
 
@@ -110,13 +116,49 @@ async def test_calendar_availability_ignores_cancelled_and_transparent_events(mo
 
 
 @pytest.mark.asyncio
+async def test_calendar_checks_all_busy_calendars_and_only_excludes_target_event(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID','vocalis-calendar')
+    monkeypatch.setenv('GOOGLE_CALENDAR_BUSY_IDS','primary,vocalis-calendar')
+    calendar = GoogleCalendar('tenant-a')
+    calls = []
+
+    async def fake_request(method, path, body=None, params=None, calendar_id=None):
+        calls.append(calendar_id)
+        if calendar_id == 'primary':
+            return {'items':[{'id':'same-event','status':'confirmed'}]}
+        return {'items':[]}
+
+    monkeypatch.setattr(calendar,'request',fake_request)
+    available = await calendar.available('2027-01-01T10:00:00+00:00','2027-01-01T10:30:00+00:00',exclude_event_id='same-event')
+    assert available is False
+    assert calls == ['primary']
+
+
+@pytest.mark.asyncio
+async def test_calendar_ignores_excluded_event_only_in_write_calendar(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID','vocalis-calendar')
+    monkeypatch.setenv('GOOGLE_CALENDAR_BUSY_IDS','primary,vocalis-calendar')
+    calendar = GoogleCalendar('tenant-a')
+
+    async def fake_request(method, path, body=None, params=None, calendar_id=None):
+        if calendar_id == 'primary':
+            return {'items':[]}
+        return {'items':[{'id':'same-event','status':'confirmed'}]}
+
+    monkeypatch.setattr(calendar,'request',fake_request)
+    assert await calendar.available('2027-01-01T10:00:00+00:00','2027-01-01T10:30:00+00:00',exclude_event_id='same-event') is True
+
+
+@pytest.mark.asyncio
 async def test_google_reschedule_uses_etag_and_retry_marker(monkeypatch):
+    monkeypatch.setenv('GOOGLE_CALENDAR_ID','primary')
+    monkeypatch.delenv('GOOGLE_CALENDAR_BUSY_IDS',raising=False)
     calendar = GoogleCalendar('tenant-a')
     event = {'id':'event-1','etag':'etag-1','status':'confirmed','start':{'dateTime':'2027-01-01T10:00:00+00:00'},
              'extendedProperties':{'private':{'existing':'value'}}}
     calls = []
 
-    async def fake_request(method, path, body=None, params=None, headers=None):
+    async def fake_request(method, path, body=None, params=None, headers=None, calendar_id=None):
         calls.append((method,path,body,headers))
         if method == 'GET' and path == '/events/event-1':
             return dict(event)

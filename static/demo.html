@@ -1,5 +1,35 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vocalis | Talk to the agent</title><style>
-:root{font-family:system-ui,sans-serif;color:#edf1f7;background:#0b1220}body{margin:0;min-height:100vh;display:grid;place-items:center}main{width:min(720px,92vw);background:#142036;border:1px solid #34445f;border-radius:20px;padding:28px}h1{margin-top:0}#log{height:340px;overflow:auto;background:#0c1629;border-radius:12px;padding:16px;margin:16px 0}.msg{margin:10px 0}.you{color:#8bd3ff}.agent{color:#a5efc7}.system{color:#d1c795}form{display:flex;gap:8px}input{flex:1}input,button{border:1px solid #526582;border-radius:10px;padding:12px;background:#182842;color:white}button{cursor:pointer}button:disabled{opacity:.5}small{color:#aebbd0}#mic.recording{background:#a52f52}#privacy{padding:14px;border:1px solid #526582;border-radius:10px;margin:14px 0}#privacy label{display:flex;align-items:flex-start;gap:8px}#privacy input{flex:none;margin-top:4px}</style></head><body><main><h1>Talk to Vocalis</h1><p>Browser voice demo. Responses and timing reflect this session. The microphone sends up to 30 seconds of audio per turn.</p><div id="status" role="status">Connecting…</div><section id="privacy" hidden><p id="privacy-text"></p><label><input id="consent-check" type="checkbox" disabled>I have read this notice and agree to continue.</label><button id="agree" type="button" disabled>Agree and join</button></section><div id="log" aria-live="polite"></div><form id="form"><input id="text" maxlength="2000" placeholder="Ask a question" aria-label="Message" disabled><button type="submit" disabled>Send</button></form><p><button id="mic" type="button" aria-pressed="false" disabled>Hold to talk</button> <button id="stop" type="button" disabled>Interrupt</button></p><small id="metrics">No measured turns yet.</small></main><script>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#090909">
+<meta name="description" content="Vocalis is Anvit Tewarika’s voice assistant for checking availability and arranging appointments.">
+<title>Vocalis — A voice assistant for your time</title>
+<style>
+:root{font-family:Manrope,Inter,system-ui,sans-serif;color:#f4f4f1;background:#090909;font-synthesis:none;text-rendering:optimizeLegibility;--muted:#8a8a86;--line:#282826;--panel:#111110;--white:#f4f4f1;--mono:'DM Mono',monospace}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 72% 34%,#1b1b19 0,transparent 36%),#090909;overflow-x:hidden}button,input{font:inherit}button{cursor:pointer}.page{width:min(1440px,100%);margin:auto;padding:0 clamp(22px,6vw,92px) 42px;position:relative;z-index:1}.grid-bg{position:fixed;inset:0;pointer-events:none;opacity:.13;background-image:linear-gradient(#777 1px,transparent 1px),linear-gradient(90deg,#777 1px,transparent 1px);background-size:clamp(56px,6vw,88px) clamp(56px,6vw,88px);mask-image:linear-gradient(90deg,transparent 2%,#000 65%,transparent 100%);z-index:0}.topbar{height:82px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);font:11px var(--mono);letter-spacing:.12em;text-transform:uppercase}.brand{display:flex;align-items:center;gap:12px;color:var(--white)}.mark{width:27px;height:27px;border:1px solid #eee;display:grid;place-items:center;font:600 13px var(--mono);transform:rotate(-45deg)}.mark span{transform:rotate(45deg)}.top-note{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(290px,.85fr) minmax(440px,1.15fr);gap:clamp(42px,9vw,140px);align-items:center;padding:clamp(52px,9vh,112px) 0 72px;min-height:680px}.eyebrow{font:11px var(--mono);text-transform:uppercase;letter-spacing:.18em;color:#aaa;margin:0 0 25px}.eyebrow:before{content:'';display:inline-block;width:22px;border-top:1px solid #ddd;vertical-align:middle;margin:0 12px 3px 0}h1{font-size:clamp(46px,6.5vw,88px);line-height:.99;letter-spacing:-.075em;font-weight:500;margin:0;max-width:610px}h1 em{font-style:normal;color:#858581}.intro{color:#b6b6b1;font-size:15px;line-height:1.8;max-width:430px;margin:29px 0 36px}.features{display:grid;grid-template-columns:1fr 1fr;gap:16px 22px;margin-top:44px;padding-top:23px;border-top:1px solid var(--line);max-width:420px}.feature{font:10px var(--mono);letter-spacing:.06em;color:#a1a19c}.feature b{display:block;font:500 13px Manrope;color:#eee;margin-bottom:6px}.stage{position:relative;min-height:470px;border:1px solid #30302d;background:linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.008) 44%),#0c0c0b;overflow:hidden;isolation:isolate;box-shadow:0 30px 90px #0008}.stage:before,.stage:after{content:'';position:absolute;inset:0;pointer-events:none}.stage:before{opacity:.19;background-image:linear-gradient(#aaa 1px,transparent 1px),linear-gradient(90deg,#aaa 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(ellipse at 50% 42%,#000,transparent 72%)}.stage:after{border:1px solid #ffffff0c;inset:12px}.stage-head,.stage-foot{position:absolute;left:26px;right:26px;display:flex;justify-content:space-between;align-items:center;z-index:3;font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#aaa}.stage-head{top:27px}.stage-foot{bottom:22px;border-top:1px solid #30302d;padding-top:15px}.live{display:flex;gap:9px;align-items:center}.live-dot{width:6px;height:6px;border-radius:50%;background:#aaa;box-shadow:0 0 0 4px #aaa2}.live.connected .live-dot{background:#f6f6ef;box-shadow:0 0 0 4px #f6f6ef24}.orb-wrap{height:310px;display:grid;place-items:center;position:absolute;inset:58px 0 90px}.orb{position:relative;width:min(240px,60vw);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;filter:grayscale(1);transition:transform .8s cubic-bezier(.2,.8,.2,1),filter .7s}.orb-core{position:absolute;inset:23%;border-radius:50%;background:radial-gradient(circle at 34% 30%,#fff 0,#d3d3d0 8%,#777773 21%,#333330 42%,#10100f 69%);box-shadow:inset -12px -16px 36px #000,0 0 56px #ffffff28,0 0 110px #ffffff14;animation:core 5s ease-in-out infinite}.orb-core:before,.orb-core:after{content:'';position:absolute;inset:-12%;border:1px solid #e7e7e3aa;border-radius:48% 52% 50% 50%;transform:rotate(32deg);animation:orbit 11s linear infinite}.orb-core:after{inset:-25%;border-color:#aaa8;transform:rotate(-33deg) scaleX(.58);animation-duration:16s;animation-direction:reverse}.ring{position:absolute;inset:9%;border:1px solid #d6d6d24f;border-radius:50%;transform:rotateX(68deg) rotate(-25deg);animation:spin 20s linear infinite}.ring.r2{inset:2%;transform:rotateY(66deg) rotate(29deg);border-color:#bbb4;animation-duration:25s;animation-direction:reverse}.ring.r3{inset:16%;transform:rotateX(68deg) rotate(42deg);border-style:dashed;border-color:#7778;animation-duration:34s}.orb-label{position:absolute;bottom:-13px;font:9px var(--mono);letter-spacing:.18em;color:#aaa;text-transform:uppercase}.stage.listening .orb{transform:scale(1.06)}.stage.listening .orb-core{animation-duration:1.1s;box-shadow:inset -12px -16px 36px #000,0 0 70px #fff7,0 0 150px #fff3}.stage.speaking .orb{transform:scale(1.035)}.stage.speaking .orb-core{animation-duration:.75s}.stage.listening .orb-label,.stage.speaking .orb-label{color:#fff}.conversation{position:absolute;inset:auto 25px 65px;z-index:4;max-height:135px;overflow:auto;display:flex;flex-direction:column;gap:8px;mask-image:linear-gradient(transparent,#000 12%)}.msg{width:fit-content;max-width:87%;padding:8px 12px;border:1px solid #454541;background:#111110e8;color:#eee;font-size:11px;line-height:1.5;backdrop-filter:blur(8px);animation:rise .28s ease-out}.you{align-self:flex-end;background:#ecece8;color:#111;border-color:#eee}.agent{align-self:flex-start}.system{align-self:center;color:#aaa;font:9px var(--mono);background:#10100fd9}.controls{border-top:1px solid var(--line);padding:24px 0 0;max-width:100%}.status-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#c5c5c0}.privacy{padding:15px;border:1px solid #393936;background:#10100f;margin:0 0 16px;font-size:12px;line-height:1.55;color:#c9c9c4}.privacy p{margin:0 0 10px}.privacy label{display:flex;gap:9px;align-items:flex-start}.privacy input{accent-color:#eee;margin-top:3px}.privacy button{margin-top:11px;background:#eee;color:#111;border:0;padding:9px 14px;font-size:11px;font-weight:700}.privacy button:disabled{opacity:.45}.composer{display:grid;grid-template-columns:1fr auto auto;gap:8px}.composer input,.composer button,.secondary{height:44px;border:1px solid #464642;background:#111;color:#f4f4f1;padding:0 13px;font-size:12px}.composer input:focus{outline:1px solid #eee}.composer button[type=submit]{background:#f1f1ed;color:#111;border-color:#f1f1ed;font-weight:700}.composer button:disabled,.secondary:disabled,.composer input:disabled{opacity:.42;cursor:not-allowed}.actions{display:flex;gap:8px;margin-top:9px}.secondary{height:37px;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.secondary.primary{background:#20201e}.secondary.recording{background:#eee;color:#111;border-color:#fff;animation:pulse 1.1s infinite}.metrics{font:9px var(--mono);color:#777;margin:12px 0 0}.consent-footer{margin-top:54px;padding-top:17px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;color:#777;font:9px var(--mono);letter-spacing:.08em;text-transform:uppercase}.consent-footer a{color:#aaa;text-decoration:none}.consent-footer a:hover{color:#fff}
+@keyframes spin{to{transform:rotate(335deg) rotateX(68deg)}}@keyframes orbit{to{transform:rotate(392deg)}}@keyframes core{0%,100%{transform:scale(.96);filter:brightness(.86)}50%{transform:scale(1.04);filter:brightness(1.15)}}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes pulse{50%{box-shadow:0 0 0 5px #eee2}}@media(max-width:900px){.layout{grid-template-columns:1fr;gap:38px;padding:58px 0 45px;min-height:auto}.copy{max-width:680px}.stage{min-height:440px}.features{margin-top:30px}.intro{margin:22px 0 0}}@media(max-width:520px){.page{padding-inline:18px}.topbar{height:68px}.top-note{font-size:8px}.layout{padding-top:46px}.stage{min-height:405px}.orb-wrap{inset:48px 0 80px}.orb{width:205px}.conversation{left:16px;right:16px;bottom:61px}.stage-head,.stage-foot{left:18px;right:18px}.composer{grid-template-columns:1fr auto}.composer button[type=submit]{grid-column:2;grid-row:1}.composer input{grid-column:1;grid-row:1}.actions{margin-top:8px}.consent-footer{font-size:8px}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body><div class="grid-bg" aria-hidden="true"></div><div class="page">
+<header class="topbar"><div class="brand"><div class="mark"><span>V</span></div><span>Vocalis</span></div><div class="top-note">A personal voice assistant&nbsp; / &nbsp;Anvit Tewarika</div></header>
+<main class="layout"><section class="copy"><p class="eyebrow">Voice, with intention</p><h1>A little more room for <em>what matters.</em></h1><p class="intro">Vocalis helps people reach Anvit, find a time that works, and arrange a meeting. It checks calendar availability before asking you to confirm.</p>
+<div class="controls"><div class="status-row"><span id="status">Connecting…</span><span id="calendar-status">Calendar status checking</span></div><section id="privacy" class="privacy" hidden><p id="privacy-text"></p><label><input id="consent-check" type="checkbox" disabled>I have read this notice and agree to continue.</label><button id="agree" type="button" disabled>Agree and join</button></section><form id="form" class="composer"><input id="text" maxlength="2000" placeholder="Write a message" aria-label="Message" disabled><button type="submit" disabled>Send</button></form><div class="actions"><button id="mic" class="secondary primary" type="button" aria-pressed="false" disabled>Hold to talk</button><button id="stop" class="secondary" type="button" disabled>Interrupt</button></div><p id="metrics" class="metrics">No measured turns yet.</p></div>
+<div class="features"><div class="feature"><b id="calendar-feature-title">Check first</b><span id="calendar-feature-copy">Calendar availability before confirmation</span></div><div class="feature"><b>Confirm clearly</b>You stay in control</div><div class="feature"><b>Designed for voice</b>Speak or type</div><div class="feature"><b>Reminders included</b>One day + two hours</div></div></section>
+<section class="stage" id="stage" aria-label="Vocalis voice assistant"><div class="stage-head"><span>Vocalis / Voice interface</span><span class="live" id="connection"><i class="live-dot"></i><span>Connecting</span></span></div><div class="orb-wrap" aria-hidden="true"><div class="orb"><div class="ring"></div><div class="ring r2"></div><div class="ring r3"></div><div class="orb-core"></div><div class="orb-label" id="orb-label">Ready when you are</div></div></div><div id="log" class="conversation" aria-live="polite" aria-label="Conversation"></div><div class="stage-foot"><span>Personal assistant</span><span>Black / White / Voice</span></div></section></main>
+<footer class="consent-footer"><span>Vocalis · Appointment assistant</span><a href="https://anvitdevadiga.github.io/vocalis/privacy.html" target="_blank" rel="noopener">Privacy & data use ↗</a></footer>
+</div>
+<script>
+fetch('/api/health',{headers:{accept:'application/json'}}).then(async response=>{
+  if(!response.ok)throw new Error('health unavailable');
+  const health=await response.json();
+  document.querySelector('#calendar-status').textContent=health.calendar_configured?'Calendar connected · IST':'Calendar setup pending';
+  if(!health.calendar_configured){
+    document.querySelector('#calendar-feature-title').textContent='Calendar setup pending';
+    document.querySelector('#calendar-feature-copy').textContent='Bookings stay disabled until connected';
+  }
+}).catch(()=>{document.querySelector('#calendar-status').textContent='Calendar status unavailable'});
 let ws, audio, audioUrl, reconnectTimer, reconnectDelay=1000;
 let recording=false, micHeld=false, micStarting=false, chunks=[], capturedSamples=0;
 let stream, context, processor, source, mute;
@@ -31,6 +61,7 @@ function line(kind,text){
   log.scrollTop=log.scrollHeight;
 }
 function stopAudio(){
+  document.querySelector('#stage').classList.remove('speaking');
   if(!audio)return;
   audio.pause();
   audio.removeAttribute('src');
@@ -50,6 +81,8 @@ function connect(){
     if(ws!==socket)return;
     reconnectDelay=1000;
     status.textContent='Connected';
+    document.querySelector('#connection').classList.add('connected');
+    document.querySelector('#connection span:last-child').textContent='Online';
   };
   socket.onclose=event=>{
     if(ws!==socket)return;
@@ -60,6 +93,8 @@ function connect(){
     agreeButton.disabled=true;
     noticeVersion=null;
     status.textContent='Disconnected. Reconnecting…';
+    document.querySelector('#connection').classList.remove('connected');
+    document.querySelector('#connection span:last-child').textContent='Reconnecting';
     if(recording||micStarting)finish();
     if(event.code===1008){status.textContent='Connection was not accepted. Reload to try again.';return}
     reconnectTimer=setTimeout(connect,reconnectDelay);
@@ -86,17 +121,19 @@ function connect(){
     if(message.type==='cancel_audio'){currentTurn=message.turn_id;stopAudio()}
     if(message.type==='transcription')line('you',message.text);
     if(message.type==='response'&&message.turn_id===currentTurn){
+      document.querySelector('#stage').classList.remove('listening');
       line('agent',message.text);
       document.querySelector('#metrics').textContent='Server response: '+message.metrics.end_to_end_response_ms+' ms';
     }
     if(message.type==='audio'&&message.turn_id===currentTurn){
+      document.querySelector('#stage').classList.add('speaking');
       stopAudio();
       const bytes=Uint8Array.from(atob(message.audio),c=>c.charCodeAt(0));
       audioUrl=URL.createObjectURL(new Blob([bytes],{type:'audio/mpeg'}));
       const player=new Audio(audioUrl);
       audio=player;
-      player.onended=()=>{if(audio===player)stopAudio()};
-      player.play().catch(()=>line('system','Audio playback was blocked.'));
+      player.onended=()=>{if(audio===player){stopAudio();document.querySelector('#stage').classList.remove('speaking')}};
+      player.play().catch(()=>{document.querySelector('#stage').classList.remove('speaking');line('system','Audio playback was blocked.')});
     }
     if(message.type==='error')line('system',message.text);
   };
@@ -130,6 +167,8 @@ function releaseMicrophone(){
   if(stream){stream.getTracks().forEach(track=>track.stop());stream=null}
   if(context){const old=context;context=null;old.close().catch(()=>{})}
   mic.classList.remove('recording');
+  document.querySelector('#stage').classList.remove('listening');
+  document.querySelector('#orb-label').textContent='Ready when you are';
   mic.setAttribute('aria-pressed','false');
 }
 async function start(){
@@ -165,6 +204,8 @@ async function start(){
     mute.connect(context.destination);
     recording=true;
     mic.classList.add('recording');
+    document.querySelector('#stage').classList.add('listening');
+    document.querySelector('#orb-label').textContent='Listening';
     mic.setAttribute('aria-pressed','true');
     stopAudio();
     send('interrupt',{});

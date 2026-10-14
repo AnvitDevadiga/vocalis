@@ -91,3 +91,17 @@ async def test_missing_calendar_credentials_do_not_reserve_a_slot(tmp_path, monk
     result = await booking.book_appointment(store, tenant, 'Alex', '5551234', 'Checkup', start, end, 'missing-key')
     assert result == {'ok': False, 'error': 'calendar_not_configured'}
     assert store.appointments(tenant) == []
+
+
+@pytest.mark.asyncio
+async def test_public_demo_never_falls_back_to_local_booking(tmp_path, monkeypatch):
+    store = Store(tmp_path/'db.sqlite')
+    tenant = store.create_tenant('Vocalis Portfolio Demo', 'key')
+    monkeypatch.setenv('VOCALIS_PUBLIC_DEMO','1')
+    monkeypatch.setenv('VOCALIS_DEMO_TENANT_ID',tenant)
+    monkeypatch.delenv('GOOGLE_CALENDAR_TENANT_ID',raising=False)
+    start = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=2,minutes=30)).isoformat()
+    result = await booking.book_appointment(store,tenant,'Alex','5551234','Meeting',start,end,'public-demo-key')
+    assert result == {'ok':False,'error':'calendar_not_configured'}
+    assert store.appointments(tenant) == []

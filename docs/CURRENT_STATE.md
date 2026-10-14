@@ -1,22 +1,44 @@
-# Current state audit
+# Current state
 
-## Before changes
+## Product
 
-The repository held one 921-line FastAPI application, one 2,738-line static HTML dashboard, a README, setup scripts, and a reference video. No tests or deployment files existed. `pytest -q` found no tests. The original app could not import in this environment because Groq/Edge TTS/Whisper were absent. The old browser used push-to-talk PCM over WebSocket, blocking per-turn STT, one non-streaming LLM call, then full-file TTS. There was no VAD, interruption, cancellation, telephony, LangGraph, RAG, provider abstraction, persistence, tenant boundary, or authenticated API. Calendar and CRM were in-memory mocks with pre-seeded people. The UI showed a hard-coded initial call count of 28; README latency, pricing, and performance assertions were unmeasured. Booking could silently choose a next-day fallback and the LLM could say a booking was confirmed before the mock calendar succeeded. Global settings and REST endpoints were unauthenticated. Runtime imports loaded Whisper at startup. Temporary audio files were cleaned, but no call records or audit events persisted. There was no Docker, CI, consent, retention, webhook, or deployment configuration.
+Vocalis is Anvit Tewarika's personal voice assistant for arranging meetings. Visitors can talk or type, the assistant checks calendar availability, asks for explicit confirmation, and creates a calendar event. The public experience is a portfolio demo, not a general-purpose multi-tenant phone service.
 
-## After changes
+## Implemented
 
-The original source remains available in Git history; the unused prototype files were removed from the current tree. The served app is `app.py`, with `vocalis/store.py` and `vocalis/engine.py`. It adds API-key tenant isolation, SQLite persistence for calls/events/documents/appointments/leads, idempotent local booking, signed Twilio voice webhooks, a browser voice/text demo, cancellation of in-flight browser turns, lexical retrieval, explicit escalation, optional Groq/Whisper/Edge TTS providers, and optional Google Calendar/HubSpot API adapters. External calendar bookings reserve a local slot before contacting Google and can recover uncertain outcomes using the same idempotency key. Twilio gather turns use a persistent database claim and atomically commit the final response with call state. HubSpot lead capture writes a local sync job atomically; leased claims, retry backoff, stale-worker fencing, and an optional worker handle delivery. Tests cover tenant isolation, API-key scope, cancellation, webhook signature and retry handling, booking recovery, CRM worker concurrency, and local idempotency.
+- FastAPI backend with tenant-scoped PostgreSQL/SQLite storage and authenticated management APIs.
+- Groq language and speech transcription, Edge TTS, browser WebSocket conversation, and explicit demo consent.
+- Local and Google Calendar booking adapters with idempotency, retry recovery, conflict checks, and cancellation/rescheduling APIs.
+- Public demo calendar readiness check. Public appointments fail closed unless the Google Calendar integration is configured.
+- Configurable conflict calendars through `GOOGLE_CALENDAR_BUSY_IDS`, with events written only to `GOOGLE_CALENDAR_ID`.
+- Event-level reminders at 24 hours and 2 hours before each confirmed booking.
+- Responsive black-and-white portfolio and browser demo with an animated voice orb and reduced-motion support.
+- Deterministic tests, CI, deployment docs, privacy page, and phased roadmap.
 
-## Remaining gaps and risks
+## Needs owner action
 
-- **Real-time:** Browser sends a complete utterance; Whisper transcribes after release. Groq completion and Edge TTS synthesis are whole-response. Phone calls use Twilio Gather/Say. This is conversational voice, but not low-latency streaming. There is no server-side VAD or robust acoustic barge-in.
-- **Persistence:** SQLite remains the default for local work. A PostgreSQL store, Alembic schema, and read-only-source SQLite transfer command are available. PostgreSQL tests exercise migration, tenant scoping, webhook/CRM persistence, concurrent overlapping bookings, and transfer of pending work. Private SQLite/PostgreSQL backup tooling and automatic 30-day call-state retention now exist; scheduled off-host backups and restore drills are not configured. Browser cancellation and public demo rate limits are still process-local.
-- **Booking recovery:** External calendar bookings now reserve the local slot before the provider call. An uncertain provider result remains pending and can be retried with the same key after two minutes; it is never announced as confirmed. This is a pilot recovery mechanism, not a substitute for a durable job worker, operational reconciliation dashboard, or provider sandbox validation. Rejected reservations remain visible in appointment records for audit.
-- **RAG:** Tenant-scoped lexical chunk retrieval exists. No PDF parsing, embeddings, vector index, reranker, or reliable citation enforcement.
-- **Tools:** Local booking/cancel/reschedule and lead create are typed API operations; optional Google Calendar availability, booking, cancellation, and rescheduling are implemented with idempotent recovery. The voice runtime supports a narrow booking draft/confirmation path; a general typed conversational tool registry, voice-driven rescheduling/cancellation, follow-up sending, and full transfer orchestration are not implemented. Google and HubSpot require live credentials and provider verification.
-- **Frontend:** New static browser demo exists. No Next.js admin dashboard or call-detail views. The old dashboard is archived because it contains fake metrics and mock data.
-- **Observability:** Events and actual server turn durations are stored and exposed. A token-protected, privacy-safe HTTP request/latency Prometheus endpoint is implemented. The requested stage-by-stage speech/LLM/TTS timing, tracing, cost accounting, remote scraper, and alerts remain.
-- **Security:** API keys are hashed in SQLite, but no key rotation, RBAC, SSO, encrypted credential vault, or user identity. The browser demo requires explicit consent and call/event/state retention is configurable; phone-call consent and separate appointment/lead/knowledge lifecycles remain. Public demo rate limit is process-local. Signatures depend on a correctly configured public URL.
-- **Evaluation:** Seven seeded fixture scenarios and deterministic tests exist; no full simulated conversation corpus, judge/human review, hallucination rate, or evaluated live providers.
-- **Deployment:** The Docker startup path applies Alembic migrations when PostgreSQL is configured; Docker runs as a non-root user. The Render free preview is live with Neon Postgres, and the GitHub Pages portfolio links to it. The hosted Google Calendar adapter is not connected. Backup scheduling/restore drills and load validation remain unverified. Free hosting is preview-only.
+- Complete the Google OAuth account grant for `anvit.works@gmail.com` and provide a refresh token to Render through its secret settings. The user has asked us not to modify or inspect Render secrets.
+- Set the destination Vocalis calendar plus busy calendars (`primary` and the Vocalis calendar) in Render.
+- Confirm work days/hours and the preferred speech sample after hearing the deployed demo.
+
+## Known limits
+
+- The hosted Google integration has not yet been live-tested. Until OAuth and Render environment variables are configured, bookings fail closed.
+- Voice is utterance based: the browser records a bounded clip, then transcription, response generation, and speech synthesis run in sequence. It is not low-latency full-duplex speech.
+- Current free TTS is configurable Edge TTS. Voice quality varies by browser/network and does not reproduce a proprietary ChatGPT voice.
+- No Gmail notification, authentication for public visitors, office-hour enforcement, visitor reschedule/cancel UI, shared distributed rate limiter, or production alerting is implemented.
+- Render free hosting may sleep between requests. The project needs live provider verification, load testing, backup restore drills, and retention/privacy review before relying on it for business operations.
+
+## Repository map
+
+| Path | Purpose |
+|---|---|
+| `app.py` | FastAPI routes, API validation, health/readiness, and WebSocket entry points |
+| `vocalis/engine.py` | Conversation runtime and Google/Groq/Whisper/TTS provider adapters |
+| `vocalis/booking.py`, `vocalis/appointments.py` | Booking reservations, retries, cancellation, and rescheduling |
+| `vocalis/store.py` | Tenant-scoped persistence and concurrency controls |
+| `static/demo.html` | Render-hosted visitor voice and text interface |
+| `site/` | GitHub Pages portfolio and privacy page |
+| `tests/` | Unit, integration, conversation, security, and realtime checks |
+| `docs/` | Architecture, integration, deployment, evaluation, security, and roadmap |
+| `alembic/` | PostgreSQL schema migrations |

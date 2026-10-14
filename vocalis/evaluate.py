@@ -64,16 +64,18 @@ async def run():
         store.end_call(tenant, booking_call)
 
         conflict_call = store.create_call(tenant, 'simulation')
-        await booking_engine.turn(tenant, conflict_call, 'Book the same slot for Alex')
-        conflict = await booking_engine.turn(tenant, conflict_call, 'confirm')
-        checks = {'no_false_confirmation': 'could not confirm' in conflict['text'].lower(),
+        conflict = await booking_engine.turn(tenant, conflict_call, 'Book the same slot for Alex')
+        checks = {'no_false_confirmation': 'not available' in conflict['text'].lower()
+                  and 'Please confirm' not in conflict['text'],
                   'no_extra_booking': len(store.appointments(tenant)) == 1}
         results.append({'scenario': 'booking_conflict', 'passed': all(checks.values()), 'checks': checks,
                         'server_turn_ms': conflict['metrics']['end_to_end_response_ms']})
         store.end_call(tenant, conflict_call)
 
         cancel_call = store.create_call(tenant, 'simulation')
-        await booking_engine.turn(tenant, cancel_call, 'Book a consultation for Alex')
+        cancel_start = (datetime.now(timezone.utc) + timedelta(days=8)).replace(microsecond=0).isoformat()
+        cancel_engine = Engine(store, llm=BookingFixtureLLM(cancel_start))
+        await cancel_engine.turn(tenant, cancel_call, 'Book a consultation for Alex')
         cancelled = await booking_engine.turn(tenant, cancel_call, 'never mind')
         checks = {'draft_cleared': not store.call(tenant, cancel_call)['state'].get('appointment_draft'),
                   'no_extra_booking': len(store.appointments(tenant)) == 1,

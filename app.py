@@ -308,7 +308,16 @@ def health():
         store.one('SELECT 1 AS ready')
     except Exception:
         return JSONResponse({'status':'unavailable','database':'unavailable'},status_code=503)
-    return {'status':'ok','database':'ok','llm_configured':bool(os.getenv('GROQ_API_KEY')),'public_demo':bool(demo_tenant())}
+    tenant = demo_tenant()
+    calendar_configured = False
+    if tenant:
+        try:
+            GoogleCalendar(tenant['id']).validate_configuration()
+            calendar_configured = True
+        except ProviderError:
+            pass
+    return {'status':'ok','database':'ok','llm_configured':bool(os.getenv('GROQ_API_KEY')),
+            'public_demo':bool(tenant),'calendar_configured':calendar_configured}
 
 
 @app.get('/api/health/live')
@@ -366,9 +375,15 @@ async def availability(data: AvailabilityIn, tenant=Depends(auth)):
         raise HTTPException(422,'start_at must be in the future')
     if not store.slot_available(tenant['id'],start.isoformat(),end.isoformat()):
         return {'available':False,'start_at':start.isoformat(),'end_at':end.isoformat(),'source':'local'}
-    if os.getenv('GOOGLE_CALENDAR_TENANT_ID') == tenant['id']:
+    calendar_required = (
+        os.getenv('GOOGLE_CALENDAR_TENANT_ID') == tenant['id']
+        or (os.getenv('VOCALIS_PUBLIC_DEMO') == '1' and os.getenv('VOCALIS_DEMO_TENANT_ID') == tenant['id'])
+    )
+    if calendar_required:
         try:
-            available = await GoogleCalendar(tenant['id']).available(start.isoformat(),end.isoformat())
+            calendar = GoogleCalendar(tenant['id'])
+            calendar.validate_configuration()
+            available = await calendar.available(start.isoformat(),end.isoformat())
         except Exception as exc:
             raise HTTPException(503,'Calendar availability could not be verified') from exc
         source = 'google_calendar'

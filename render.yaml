@@ -19,6 +19,8 @@ services:
         value: https://anvitdevadiga.github.io
       - key: VOCALIS_CALL_RETENTION_DAYS
         value: "30"
+      - key: VOCALIS_TIMEZONE
+        value: Asia/Kolkata
       - key: GROQ_API_KEY
         sync: false
       - key: VOCALIS_STT_PROVIDER
