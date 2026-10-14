@@ -212,6 +212,10 @@ class Store:
     def tenant(self, tenant_id):
         return self.one('SELECT id,name,config FROM tenants WHERE id=?', (tenant_id,))
 
+    def set_tenant_name(self, tenant_id, name):
+        with self.connect() as db:
+            db.execute('UPDATE tenants SET name=? WHERE id=? AND name<>?', (name, tenant_id, name))
+
     def call(self, tenant_id, call_id):
         row = self.one('SELECT * FROM calls WHERE tenant_id=? AND id=?', (tenant_id, call_id))
         if row:

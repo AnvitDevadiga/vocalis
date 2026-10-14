@@ -3,26 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#08111f">
+  <meta name="theme-color" content="#090909">
+  <meta name="description" content="How Vocalis processes conversation and meeting booking information.">
   <title>Privacy — Vocalis</title>
   <style>
-    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}body{margin:0;background:#08111f;color:#edf4fb;line-height:1.65}a{color:#63e1df}a:focus-visible{outline:2px solid #63e1df;outline-offset:4px}.wrap{width:min(760px,calc(100% - 36px));margin:auto}header,footer{border-bottom:1px solid #29405a;padding:22px 0}footer{border-top:1px solid #29405a;border-bottom:0;color:#a9b9c9}main{padding:55px 0 75px}h1{font-size:clamp(2.4rem,6vw,4rem);letter-spacing:-.05em;line-height:1.1}h2{margin-top:38px;font-size:1.3rem}p,li{color:#c3d0dc}ul{padding-left:22px}
+    :root{color-scheme:dark;font-family:Manrope,Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 78% 8%,#20201e 0,transparent 38%),#090909;color:#f3f3ef;line-height:1.7}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.1;background-image:linear-gradient(#777 1px,transparent 1px),linear-gradient(90deg,#777 1px,transparent 1px);background-size:72px 72px;mask-image:linear-gradient(90deg,transparent,#000 70%,transparent)}a{color:#fff}a:focus-visible{outline:2px solid #fff;outline-offset:4px}.wrap{position:relative;width:min(760px,calc(100% - 36px));margin:auto}header,footer{border-bottom:1px solid #30302d;padding:22px 0}footer{border-top:1px solid #30302d;border-bottom:0;color:#a2a29c}main{padding:55px 0 75px}h1{font-size:clamp(2.4rem,6vw,4rem);letter-spacing:-.06em;line-height:1.05;font-weight:500}h2{margin-top:38px;font-size:1.3rem;font-weight:550;letter-spacing:-.03em}p,li{color:#b6b6b0}ul{padding-left:22px}.brand{font:500 11px 'DM Mono',monospace;letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
   </style>
 </head>
 <body>
-  <header><div class="wrap"><a href="./">← Vocalis</a></div></header>
+  <header><div class="wrap"><a class="brand" href="./">Vocalis</a></div></header>
   <main class="wrap">
     <h1>Privacy</h1>
-    <p>Last updated 13 October 2026. Vocalis is a public engineering demo. Please use fictional names and contact details when trying it.</p>
-    <h2>What the demo processes</h2>
-    <p>If you start a voice conversation, your browser sends microphone audio to the Vocalis backend on Render. The hosted demo uses Groq to transcribe speech and generate replies, and a speech provider to produce spoken responses. It does not save a recording of your microphone audio. It stores conversation text, call state, and diagnostic events in a Neon database. Primary call data is deleted after 30 days by default; private database backups, if any, may have separate retention periods.</p>
-    <p>If you submit a booking, the demo stores the name, phone number, service, and requested time. Once Google Calendar is connected, it will also write the name, service, and time to a separate private demo calendar. Leads and appointments are not covered by the automatic call-data retention process.</p>
+    <p>Last updated 14 October 2026. Vocalis is Anvit Tewarika's personal voice assistant. Please use fictional contact details when exploring the portfolio site.</p>
+    <h2>Conversations</h2>
+    <p>If you start a voice conversation, your browser sends microphone audio to the Vocalis backend on Render. Groq transcribes speech and generates replies; Edge TTS produces spoken responses. Vocalis does not save a microphone recording. It stores conversation text, call state, and diagnostic events in Neon. Call data is deleted after 30 days by default. Backups, if created, may have separate retention periods.</p>
+    <h2>Meeting requests</h2>
+    <p>If you request a meeting, Vocalis stores your name, phone number, service, and requested time. Confirmed bookings are written to the dedicated Vocalis calendar with your name, service, and meeting time. Calendar events include reminders one day and two hours before the meeting. Booking and lead records are not covered by the automatic call-data deletion process.</p>
     <h2>Google Calendar access</h2>
-    <p>The Google account owner authorizes Vocalis to manage events on calendars they own. The deployed backend is configured to use only the dedicated Vocalis demo calendar. Public visitors do not sign in with Google or grant access to their calendars.</p>
+    <p>The owner authorized Vocalis to view and manage events on calendars they own, so it can check for conflicts. Vocalis writes new bookings only to the dedicated Vocalis calendar. Visitors do not sign in with Google or grant access to their calendars.</p>
     <h2>Questions</h2>
-    <p>For questions or data removal requests, contact the project owner through the <a href="https://github.com/AnvitDevadiga/vocalis/issues">Vocalis GitHub repository</a>. Do not include sensitive data in a public issue.</p>
+    <p>For questions or data removal requests, contact the project owner through the <a href="https://github.com/AnvitDevadiga/vocalis/issues">Vocalis GitHub repository</a>. Do not include sensitive information in a public issue.</p>
   </main>
-  <footer><div class="wrap">Vocalis · <a href="./">Back to project</a></div></footer>
+  <footer><div class="wrap">Vocalis · <a href="./">Back to Vocalis</a></div></footer>
 </body>
 </html>

@@ -84,23 +84,23 @@ def test_application_startup_applies_call_retention(monkeypatch, tmp_path):
         assert store.call(tenant,call_id) is None
 
 
-def test_public_demo_tenant_is_bootstrapped_only_when_enabled_and_configured(monkeypatch, tmp_path):
-    store = Store(tmp_path/'demo-bootstrap.sqlite')
+def test_public_assistant_tenant_is_bootstrapped_only_when_enabled_and_configured(monkeypatch, tmp_path):
+    store = Store(tmp_path/'assistant-bootstrap.sqlite')
     monkeypatch.setattr(module,'store',store)
-    monkeypatch.delenv('VOCALIS_DEMO_TENANT_ID',raising=False)
-    monkeypatch.setenv('VOCALIS_DEMO_TENANT_NAME','Portfolio demo')
-    monkeypatch.setenv('VOCALIS_PUBLIC_DEMO','1')
+    monkeypatch.delenv('VOCALIS_PUBLIC_TENANT_ID',raising=False)
+    monkeypatch.setenv('VOCALIS_PUBLIC_TENANT_NAME','Portfolio assistant')
+    monkeypatch.setenv('VOCALIS_PUBLIC_ASSISTANT','1')
     monkeypatch.delenv('GROQ_API_KEY',raising=False)
-    module.ensure_public_demo_tenant()
+    module.ensure_public_assistant_tenant()
     assert store.all('SELECT id FROM tenants') == []
 
     monkeypatch.setenv('GROQ_API_KEY','test-secret')
     with TestClient(module.app):
-        tenant_id=module.os.getenv('VOCALIS_DEMO_TENANT_ID')
+        tenant_id=module.os.getenv('VOCALIS_PUBLIC_TENANT_ID')
         assert tenant_id
-        assert store.tenant(tenant_id)['name']=='Portfolio demo'
-        assert module.demo_tenant()['id']==tenant_id
-    module.ensure_public_demo_tenant()
+        assert store.tenant(tenant_id)['name']=='Portfolio assistant'
+        assert module.public_tenant()['id']==tenant_id
+    module.ensure_public_assistant_tenant()
     assert store.all('SELECT id FROM tenants') == [{'id':tenant_id}]
 
 
@@ -117,7 +117,7 @@ def test_health_check_allows_only_configured_portfolio_origin(monkeypatch, tmp_p
 
 
 def test_websocket_origin_policy(monkeypatch):
-    ws = SimpleNamespace(url=URL('ws://api.example.test/ws/demo'), headers={'origin': 'http://api.example.test'})
+    ws = SimpleNamespace(url=URL('ws://api.example.test/ws/vocalis'), headers={'origin': 'http://api.example.test'})
     assert module.websocket_origin_allowed(ws)
 
     ws.headers['origin'] = 'https://evil.example'
@@ -136,7 +136,7 @@ def test_websocket_rejects_foreign_origin_before_tenant_lookup(monkeypatch):
     monkeypatch.setattr(module, 'ws_tenant', lambda _ws: pytest.fail('tenant lookup must not run'))
     client = TestClient(module.app)
     with pytest.raises(WebSocketDisconnect) as closed:
-        with client.websocket_connect('/ws/demo', headers={'origin': 'https://evil.example'}):
+        with client.websocket_connect('/ws/vocalis', headers={'origin': 'https://evil.example'}):
             pass
     assert closed.value.code == 1008
 

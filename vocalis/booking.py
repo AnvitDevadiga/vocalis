@@ -3,26 +3,24 @@
 import os
 
 from vocalis.engine import GoogleCalendar, ProviderError
+from vocalis.public_config import is_tenant as is_public_assistant_tenant
 
 
 async def book_appointment(store, tenant_id, name, phone, service, start_at, end_at, key):
-    public_demo_calendar_required = (
-        os.getenv('VOCALIS_PUBLIC_DEMO') == '1'
-        and os.getenv('VOCALIS_DEMO_TENANT_ID') == tenant_id
-    )
-    if public_demo_calendar_required and os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id:
+    public_calendar_required = is_public_assistant_tenant(tenant_id)
+    if public_calendar_required and os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id:
         return {'ok': False, 'error': 'calendar_not_configured'}
 
     prior = store.prior_booking(tenant_id, name, phone, service, start_at, end_at, key)
     if prior is not None:
-        if public_demo_calendar_required and prior.get('ok'):
+        if public_calendar_required and prior.get('ok'):
             appointment = store.one('SELECT external_id FROM appointments WHERE tenant_id=? AND id=?',
                                     (tenant_id, prior.get('appointment_id')))
             if not appointment or not appointment['external_id']:
                 return {'ok': False, 'error': 'calendar_outcome_unknown'}
         return prior
 
-    if os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id and not public_demo_calendar_required:
+    if os.getenv('GOOGLE_CALENDAR_TENANT_ID') != tenant_id and not public_calendar_required:
         return store.book(tenant_id, name, phone, service, start_at, end_at, key)
 
     calendar = GoogleCalendar(tenant_id)

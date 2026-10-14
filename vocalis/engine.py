@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from vocalis.public_config import is_tenant as is_public_assistant_tenant
+
 
 class ProviderError(Exception):
     pass
@@ -333,10 +335,7 @@ class Engine:
         start_utc, end_utc = start.astimezone(timezone.utc), end.astimezone(timezone.utc)
         if not self.store.slot_available(tenant_id, start_utc.isoformat(), end_utc.isoformat()):
             return False
-        calendar_required = (
-            os.getenv('VOCALIS_PUBLIC_DEMO') == '1'
-            and os.getenv('VOCALIS_DEMO_TENANT_ID') == tenant_id
-        )
+        calendar_required = is_public_assistant_tenant(tenant_id)
         if os.getenv('GOOGLE_CALENDAR_TENANT_ID') == tenant_id or calendar_required:
             calendar = GoogleCalendar(tenant_id)
             calendar.validate_configuration()

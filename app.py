@@ -27,6 +27,11 @@ from vocalis.booking import book_appointment
 from vocalis.appointments import reschedule_appointment
 from vocalis.crm import sync_claim
 from vocalis.engine import Engine, GoogleCalendar, HubSpotCRM, ProviderError
+from vocalis.public_config import enabled as public_assistant_enabled
+from vocalis.public_config import is_tenant as is_public_assistant_tenant
+from vocalis.public_config import set_tenant_id as set_public_assistant_tenant_id
+from vocalis.public_config import tenant_id as public_assistant_tenant_id
+from vocalis.public_config import tenant_name as public_assistant_tenant_name
 from vocalis.store import Store, request_fingerprint
 
 DB_PATH = os.getenv('VOCALIS_DATABASE_URL') or os.getenv('VOCALIS_DB_PATH', 'data/vocalis.db')
@@ -37,7 +42,7 @@ _buckets = OrderedDict()
 _bucket_lock = Lock()
 _RATE_LIMIT_MAX_KEYS = 10_000
 _MAX_AUDIO_BASE64_CHARS = 4_000_000
-_DEMO_PRIVACY_NOTICE_VERSION = '2026-10-12-groq-audio-v1'
+_PUBLIC_PRIVACY_NOTICE_VERSION = '2026-10-12-groq-audio-v1'
 _HTTP_METRICS_LOCK = Lock()
 _HTTP_METRICS_BUCKETS = (0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0)
 _HTTP_METRICS = {}
@@ -63,17 +68,19 @@ async def prune_expired_calls():
         logger.error('call_retention_failed error_type=%s', type(exc).__name__)
 
 
-def ensure_public_demo_tenant():
-    """Create the one public demo tenant deterministically, with no usable API key."""
-    if os.getenv('VOCALIS_PUBLIC_DEMO') != '1' or not os.getenv('GROQ_API_KEY'):
+def ensure_public_assistant_tenant():
+    """Create the public Vocalis tenant deterministically, with no usable API key."""
+    if not public_assistant_enabled() or not os.getenv('GROQ_API_KEY'):
         return
-    tenant_id = os.getenv('VOCALIS_DEMO_TENANT_ID')
+    tenant_id = public_assistant_tenant_id()
+    name = public_assistant_tenant_name()
     if tenant_id:
+        if store.tenant(tenant_id):
+            store.set_tenant_name(tenant_id, name)
         return
-    name = os.getenv('VOCALIS_DEMO_TENANT_NAME')
     if not name:
         return
-    tenant_id = str(uuid5(NAMESPACE_URL, 'https://vocalis.invalid/public-demo/'+name))
+    tenant_id = str(uuid5(NAMESPACE_URL, 'https://vocalis.invalid/public-assistant/'+name))
     if not store.tenant(tenant_id):
         discarded_api_key = secrets.token_urlsafe(32)
         try:
@@ -82,7 +89,7 @@ def ensure_public_demo_tenant():
             # Another app process may have initialized the same deterministic tenant.
             if not store.tenant(tenant_id):
                 raise
-    os.environ['VOCALIS_DEMO_TENANT_ID'] = tenant_id
+    set_public_assistant_tenant_id(tenant_id)
 
 
 async def retention_loop():
@@ -93,7 +100,7 @@ async def retention_loop():
 
 @asynccontextmanager
 async def lifespan(_app):
-    await asyncio.to_thread(ensure_public_demo_tenant)
+    await asyncio.to_thread(ensure_public_assistant_tenant)
     await prune_expired_calls()
     task = asyncio.create_task(retention_loop())
     try:
@@ -213,9 +220,9 @@ def audio_payload_error(payload):
     return None
 
 
-def demo_tenant():
-    tenant_id = os.getenv('VOCALIS_DEMO_TENANT_ID')
-    if os.getenv('VOCALIS_PUBLIC_DEMO') != '1' or not os.getenv('GROQ_API_KEY') or not tenant_id:
+def public_tenant():
+    tenant_id = public_assistant_tenant_id()
+    if not public_assistant_enabled() or not os.getenv('GROQ_API_KEY') or not tenant_id:
         return None
     return store.tenant(tenant_id)
 
@@ -232,7 +239,7 @@ def websocket_origin_allowed(ws):
 
     origin = ws.headers.get('origin')
     # Non-browser clients do not send Origin; the authenticated /ws endpoint
-    # still requires its API key, and public /ws/demo remains rate limited.
+    # still requires its API key, and public /ws/vocalis remains rate limited.
     if origin is None:
         return True
     try:
@@ -298,7 +305,7 @@ class LeadIn(BaseModel):
 
 @app.get('/')
 def home():
-    return FileResponse(Path(__file__).parent / 'static' / 'demo.html')
+    return FileResponse(Path(__file__).parent / 'static' / 'assistant.html')
 
 
 @app.get('/api/health')
@@ -308,7 +315,7 @@ def health():
         store.one('SELECT 1 AS ready')
     except Exception:
         return JSONResponse({'status':'unavailable','database':'unavailable'},status_code=503)
-    tenant = demo_tenant()
+    tenant = public_tenant()
     calendar_configured = False
     if tenant:
         try:
@@ -317,7 +324,7 @@ def health():
         except ProviderError:
             pass
     return {'status':'ok','database':'ok','llm_configured':bool(os.getenv('GROQ_API_KEY')),
-            'public_demo':bool(tenant),'calendar_configured':calendar_configured}
+            'assistant_ready':bool(tenant),'calendar_configured':calendar_configured}
 
 
 @app.get('/api/health/live')
@@ -377,7 +384,7 @@ async def availability(data: AvailabilityIn, tenant=Depends(auth)):
         return {'available':False,'start_at':start.isoformat(),'end_at':end.isoformat(),'source':'local'}
     calendar_required = (
         os.getenv('GOOGLE_CALENDAR_TENANT_ID') == tenant['id']
-        or (os.getenv('VOCALIS_PUBLIC_DEMO') == '1' and os.getenv('VOCALIS_DEMO_TENANT_ID') == tenant['id'])
+        or is_public_assistant_tenant(tenant['id'])
     )
     if calendar_required:
         try:
@@ -530,19 +537,19 @@ def ws_tenant(ws):
     key = ws.headers.get('x-api-key')
     if key:
         return store.tenant_by_key_hash(hash_key(key))
-    if ws.url.path == '/ws/demo':
-        return demo_tenant()
+    if ws.url.path == '/ws/vocalis':
+        return public_tenant()
     return None
 
 
 @app.websocket('/ws')
-@app.websocket('/ws/demo')
+@app.websocket('/ws/vocalis')
 async def websocket_call(ws: WebSocket):
     if not websocket_origin_allowed(ws):
         await ws.close(code=1008)
         return
-    is_demo = ws.url.path == '/ws/demo'
-    if is_demo:
+    is_public = ws.url.path == '/ws/vocalis'
+    if is_public:
         try:
             retention = call_retention_days()
         except RuntimeError:
@@ -552,16 +559,16 @@ async def websocket_call(ws: WebSocket):
     if not tenant:
         await ws.close(code=1008)
         return
-    if ws.url.path == '/ws/demo':
+    if ws.url.path == '/ws/vocalis':
         try:
-            rate_limit('demo:'+str(ws.client.host),maximum=8,window=60)
+            rate_limit('vocalis:'+str(ws.client.host),maximum=8,window=60)
         except HTTPException:
             await ws.close(code=1013)
             return
     await ws.accept()
-    if is_demo:
-        await ws.send_json({'type':'consent_required','notice_version':_DEMO_PRIVACY_NOTICE_VERSION,
-                            'text':f'By continuing, you agree that text and microphone audio are sent to Vocalis for this conversation. Audio is processed by the configured transcription provider (Groq for the hosted demo) and is not saved as a recording. Primary call state is deleted after {retention} days. Private database backups, if created, may retain copies under separate retention rules. Configured AI and speech providers may process text to generate replies and speech.'})
+    if is_public:
+        await ws.send_json({'type':'consent_required','notice_version':_PUBLIC_PRIVACY_NOTICE_VERSION,
+                            'text':f'By continuing, you agree that text and microphone audio are sent to Vocalis for this conversation. Audio is processed by the configured transcription provider (Groq for the hosted assistant) and is not saved as a recording. Primary call state is deleted after {retention} days. Private database backups, if created, may retain copies under separate retention rules. Configured AI and speech providers may process text to generate replies and speech.'})
         try:
             consent = await asyncio.wait_for(ws.receive_json(), timeout=60)
         except asyncio.TimeoutError:
@@ -571,12 +578,12 @@ async def websocket_call(ws: WebSocket):
             return
         if (not isinstance(consent, dict) or consent.get('type') != 'consent'
                 or consent.get('accepted') is not True
-                or consent.get('notice_version') != _DEMO_PRIVACY_NOTICE_VERSION):
+                or consent.get('notice_version') != _PUBLIC_PRIVACY_NOTICE_VERSION):
             await ws.close(code=1008)
             return
     call_id = store.create_call(tenant['id'],'browser')
-    if is_demo:
-        store.event(tenant['id'],call_id,'consent_granted',{'notice_version':_DEMO_PRIVACY_NOTICE_VERSION})
+    if is_public:
+        store.event(tenant['id'],call_id,'consent_granted',{'notice_version':_PUBLIC_PRIVACY_NOTICE_VERSION})
     await ws.send_json({'type':'ready','call_id':call_id,'text':f"Hello, I'm the assistant for {tenant['name']}. How can I help?"})
     active = None
     generation = 0
@@ -630,11 +637,11 @@ async def websocket_call(ws: WebSocket):
             kind = payload.get('type')
             if kind not in ('text','audio','interrupt'):
                 continue
-            if ws.url.path == '/ws/demo':
+            if ws.url.path == '/ws/vocalis':
                 try:
-                    rate_limit('demo-turn:'+str(ws.client.host),maximum=20,window=60)
+                    rate_limit('vocalis-turn:'+str(ws.client.host),maximum=20,window=60)
                 except HTTPException:
-                    await ws.send_json({'type':'error','text':'Demo rate limit reached.'})
+                    await ws.send_json({'type':'error','text':'Request rate limit reached.'})
                     continue
             if kind == 'audio':
                 audio_error = audio_payload_error(payload)

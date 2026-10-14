@@ -1,4 +1,4 @@
-"""Create the stable tenant used by the public portfolio demo."""
+"""Create the stable Vocalis tenant used by its public voice endpoint."""
 import argparse
 import hashlib
 import secrets
@@ -10,7 +10,7 @@ from vocalis.store import Store
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--name', default='Vocalis Portfolio Demo')
+    parser.add_argument('--name', default='Vocalis')
     args = parser.parse_args()
     database = os.getenv('VOCALIS_DATABASE_URL')
     if not database:
@@ -25,8 +25,8 @@ def main():
         tenant_id = store.create_tenant(args.name, hashlib.sha256(discarded_api_key.encode()).hexdigest())
         action = 'created'
     print(f'{action}: {args.name}')
-    print(f'VOCALIS_DEMO_TENANT_ID={tenant_id}')
-    print('The tenant API key was intentionally discarded; the public demo uses the restricted WebSocket route.')
+    print(f'VOCALIS_PUBLIC_TENANT_ID={tenant_id}')
+    print('The generated API key was discarded; the public voice endpoint uses the restricted WebSocket route.')
     if store.is_postgres:
         store.engine.dispose()
 

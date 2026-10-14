@@ -11,10 +11,10 @@ services:
         sync: false
       - key: VOCALIS_AUTO_MIGRATE
         value: "1"
-      - key: VOCALIS_PUBLIC_DEMO
+      - key: VOCALIS_PUBLIC_ASSISTANT
         value: "1"
-      - key: VOCALIS_DEMO_TENANT_NAME
-        value: Vocalis Portfolio Demo
+      - key: VOCALIS_PUBLIC_TENANT_NAME
+        value: Vocalis
       - key: VOCALIS_ALLOWED_ORIGINS
         value: https://anvitdevadiga.github.io
       - key: VOCALIS_CALL_RETENTION_DAYS

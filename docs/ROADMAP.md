@@ -1,26 +1,25 @@
 # Vocalis roadmap
 
-Vocalis is Anvit Tewarika's personal voice assistant. A visitor can ask for a meeting, Vocalis checks existing calendar events, offers an available time for confirmation, and creates the event only after the visitor confirms. Google Calendar sends reminders one day and two hours before each event. Gmail notifications and paid voice or hosting services are out of scope for the current free portfolio demo.
+Vocalis is Anvit Tewarika's personal voice assistant. A visitor can ask for a meeting, Vocalis checks existing calendar events, offers an available time for confirmation, and creates the event only after the visitor confirms. Google Calendar sends reminders one day and two hours before each event. Gmail notifications and paid voice or hosting services are outside the current free portfolio build.
 
 ## Phase 1 — product foundation (implemented)
 
-- Reframed the portfolio and browser demo around one personal appointment assistant.
+- Reframed the portfolio and browser assistant around one personal appointment assistant.
 - Applied a monochrome, grid-based visual system with a voice orb, responsive layouts, motion states, and reduced-motion support.
-- Added timezone-aware prompts, explicit booking confirmation, and fail-closed behavior when the public demo calendar is unavailable.
+- Added timezone-aware prompts, explicit booking confirmation, and fail-closed behavior when the public assistant calendar is unavailable.
 - Updated this roadmap to state implementation status and owner dependencies.
 
-## Phase 2 — calendar correctness (implemented; live authorization pending)
+## Phase 2 — calendar correctness (implemented)
 
 - Check local reservations and every calendar listed in `GOOGLE_CALENDAR_BUSY_IDS` before asking for confirmation. Write events only to `GOOGLE_CALENDAR_ID`.
 - Check again before creating an event; use deterministic event IDs and local reservations for retry safety.
 - Add event-level Google Calendar popup reminders at 24 hours and 2 hours.
 - Test pagination, transparent/cancelled events, conflicts across multiple calendars, idempotency, provider errors, and booking races.
-- Live use still needs the Google account grant, a durable refresh token, and backend environment variables. The visitor demo must stay fail closed until these exist.
+- Google OAuth consent is complete; a durable refresh token is stored locally in `.secrets/google-calendar.env`. The hosted service stays fail closed until its owner adds the credentials to Render.
 
-## Phase 3 — live calendar activation (owner action required)
+## Phase 3 — live calendar activation (Render setup required)
 
-- Complete the Google OAuth consent once for `anvit.works@gmail.com` with the already approved `calendar.events.owned` scope.
-- Add the client ID, client secret, refresh token, demo tenant ID, destination calendar ID, and busy calendar list to Render's environment settings. The client secret and refresh token must remain private.
+- Add the client ID, client secret, refresh token, Vocalis tenant ID, destination calendar ID, and busy calendar list from `.secrets/google-calendar.env` to Render. Keep the client secret and refresh token private.
 - Verify that an existing event on the primary calendar blocks a requested time, a free slot creates one event in the Vocalis calendar, repeated requests do not duplicate it, and both reminders are attached.
 - Confirm the business timezone and working hours before adding office-hour restrictions. Current timezone default is `Asia/Kolkata`; working hours have not been supplied.
 
@@ -40,5 +39,5 @@ Vocalis is Anvit Tewarika's personal voice assistant. A visitor can ask for a me
 ## Current limits
 
 - No Gmail notification workflow, paid telephony, user login, full duplex audio, streaming TTS, working-hour rules, or visitor reschedule/cancel UI.
-- Google Calendar must be authorized and configured before real bookings are enabled. Automated tests use provider fakes and do not prove live Google behavior.
+- Google Calendar is authorized locally. Add the environment settings to Render and complete a live booking check before real bookings are enabled. Automated tests use provider fakes and do not prove live Google behavior.
 - Render free instances can sleep; the first request after inactivity may take longer.

@@ -27,7 +27,7 @@
     </div>
     <section id="capabilities"><div class="section-head"><h2>Thoughtful by design.</h2><p>A focused assistant experience, backed by explicit availability checks and a confirmation step.</p></div><div class="grid"><article class="card"><div class="icon">◎</div><h3>Natural conversation</h3><p>Speak or type naturally. Vocalis listens, responds aloud, and lets you interrupt playback.</p></article><article class="card"><div class="icon">↗</div><h3>Calendar aware</h3><p>When connected, checks configured Google Calendars for conflicts before it offers a meeting time.</p></article><article class="card"><div class="icon">▦</div><h3>Clear confirmation</h3><p>You review the proposed time and details before the assistant creates the event.</p></article><article class="card"><div class="icon">⌕</div><h3>Reminders included</h3><p>Confirmed calendar events are set to remind one day and two hours beforehand.</p></article><article class="card"><div class="icon">✓</div><h3>Private by design</h3><p>Calendar credentials stay on the backend. The assistant only books after explicit confirmation.</p></article><article class="card"><div class="icon">◇</div><h3>Built in the open</h3><p>Readable architecture, documented roadmap, and tests around booking and calendar behavior.</p></article></div></section>
     <section id="architecture"><div class="section-head"><h2>From request to confirmed meeting.</h2><p>The assistant verifies the calendar before it asks the visitor to approve the booking.</p></div><div class="flow"><div class="step"><small>01 · INPUT</small><strong>Browser or phone</strong></div><div class="step"><small>02 · VOICE</small><strong>Understand request</strong></div><div class="step"><small>03 · CONTEXT</small><strong>Check calendars</strong></div><div class="step"><small>04 · DECIDE</small><strong>Ask for approval</strong></div><div class="step"><small>05 · RECORD</small><strong>Create event</strong></div></div><p class="detail">FastAPI · Groq speech and language · Edge TTS · Neon Postgres · Google Calendar · Render</p></section>
-    <section id="demo"><div class="status"><div><h3 id="demo-title">Talk to Vocalis</h3><p id="demo-description">Talk to Vocalis by voice or text. Check the proposed time before confirming the meeting.</p><div class="actions" style="margin-top:18px"><a id="demo-link" class="button secondary" href="https://vocalis-api-z6sd.onrender.com/">Open voice demo ↗</a></div></div><span id="demo-badge" class="badge">Checking backend</span></div></section>
+    <section id="assistant"><div class="status"><div><h3 id="assistant-title">Talk to Vocalis</h3><p id="assistant-description">Talk to Vocalis by voice or text. Check the proposed time before confirming the meeting.</p><div class="actions" style="margin-top:18px"><a id="assistant-link" class="button secondary" href="https://vocalis-api-z6sd.onrender.com/">Open voice assistant ↗</a></div></div><span id="assistant-badge" class="badge">Checking backend</span></div></section>
   </main>
   <footer><div class="wrap footer-inner"><span>Vocalis · A personal voice assistant</span><span><a href="privacy.html">Privacy</a> · <a href="https://github.com/AnvitDevadiga/vocalis">Source and documentation ↗</a></span></div></footer>
   <script src="config.js"></script>
@@ -41,16 +41,17 @@
         fetch(health,{headers:{accept:'application/json'}}).then(async response=>{
           if(!response.ok)throw new Error('backend unavailable');
           const data=await response.json();
-          if(data.public_demo!==true)throw new Error('demo disabled');
-          document.querySelector('#demo-description').textContent=data.calendar_configured
+          // Keep the portfolio status badge working while the API deploy rolls out.
+          if((data.assistant_ready ?? data.public_demo)!==true)throw new Error('assistant disabled');
+          document.querySelector('#assistant-description').textContent=data.calendar_configured
             ? 'The assistant is online and checking Google Calendar before it offers a meeting time.'
             : 'The assistant is online. Calendar authorization is pending, so appointment booking is temporarily unavailable.';
-          document.querySelector('#demo-badge').textContent=data.calendar_configured?'Assistant online':'Calendar setup pending';
+          document.querySelector('#assistant-badge').textContent=data.calendar_configured?'Assistant online':'Calendar setup pending';
         }).catch(()=>{
-          document.querySelector('#demo-badge').textContent='Waking or unavailable';
+          document.querySelector('#assistant-badge').textContent='Waking or unavailable';
         });
       }catch{
-        document.querySelector('#demo-badge').textContent='Status unavailable';
+        document.querySelector('#assistant-badge').textContent='Status unavailable';
       }
     }
   </script>
