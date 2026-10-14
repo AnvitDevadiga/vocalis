@@ -19,7 +19,7 @@ Vocalis is Anvit Tewarika's personal voice assistant. A visitor can ask for a me
 
 ## Phase 3 — live calendar activation (Render setup required)
 
-- Add the client ID, client secret, refresh token, Vocalis tenant ID, destination calendar ID, and busy calendar list from `.secrets/google-calendar.env` to Render. Keep the client secret and refresh token private.
+- Upload `.secrets/google-calendar.env` to the Render service as `google-calendar.env`; the app's strict loader reads only the approved Calendar keys from `/etc/secrets/google-calendar.env`. Keep the client secret and refresh token private.
 - Verify that an existing event on the primary calendar blocks a requested time, a free slot creates one event in the Vocalis calendar, repeated requests do not duplicate it, and both reminders are attached.
 - Confirm the business timezone and working hours before adding office-hour restrictions. Current timezone default is `Asia/Kolkata`; working hours have not been supplied.
 

@@ -32,7 +32,10 @@ from vocalis.public_config import is_tenant as is_public_assistant_tenant
 from vocalis.public_config import set_tenant_id as set_public_assistant_tenant_id
 from vocalis.public_config import tenant_id as public_assistant_tenant_id
 from vocalis.public_config import tenant_name as public_assistant_tenant_name
+from vocalis.runtime_secrets import load_calendar_secret_file
 from vocalis.store import Store, request_fingerprint
+
+load_calendar_secret_file()
 
 DB_PATH = os.getenv('VOCALIS_DATABASE_URL') or os.getenv('VOCALIS_DB_PATH', 'data/vocalis.db')
 store = Store(DB_PATH)
