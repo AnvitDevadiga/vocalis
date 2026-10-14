@@ -41,8 +41,7 @@
         fetch(health,{headers:{accept:'application/json'}}).then(async response=>{
           if(!response.ok)throw new Error('backend unavailable');
           const data=await response.json();
-          // Keep the portfolio status badge working while the API deploy rolls out.
-          if((data.assistant_ready ?? data.public_demo)!==true)throw new Error('assistant disabled');
+          if(data.assistant_ready!==true)throw new Error('assistant disabled');
           document.querySelector('#assistant-description').textContent=data.calendar_configured
             ? 'The assistant is online and checking Google Calendar before it offers a meeting time.'
             : 'The assistant is online. Calendar authorization is pending, so appointment booking is temporarily unavailable.';
